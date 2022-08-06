@@ -11,16 +11,17 @@ option(WINEXT_BuildTests     "Build the unit tests when BUILD_TESTING is enabled
 option(WINEXT_BuildExamples  "Build examples"                                      ${WINEXT_MAIN_PROJECT})
 
 find_package(Boost REQUIRED)
-# header only
-add_compile_definitions(
-    BOOST_ALL_NO_LIB=1
-    _WIN32_WINNT=0x0601
-)
 
 add_library(winext INTERFACE)
 target_include_directories(winext INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${Boost_INCLUDE_DIR}
+)
+
+# header only
+target_compile_definitions(winext
+    INTERFACE BOOST_ALL_NO_LIB=1
+    INTERFACE _WIN32_WINNT=0x0601
 )
 
 if(WINEXT_BuildExamples)
