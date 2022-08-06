@@ -3,11 +3,12 @@
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/windows/basic_overlapped_handle.hpp>
 
-#include <winext/http/convert.hpp>
+#include <winasio/http/convert.hpp>
 
 #include <iostream>
 
-namespace winext{
+namespace boost{
+namespace winasio{
 namespace http{
     namespace net = boost::asio;
     namespace winnet = net::windows;
@@ -259,4 +260,5 @@ namespace http{
 
     };
 } // namespace http
-} // namespace winext
+} // namespace winasio
+} // namespace boost

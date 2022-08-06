@@ -13,7 +13,7 @@
 #include "boost/asio/windows/stream_handle.hpp"
 #include "boost/asio/windows/overlapped_ptr.hpp"
 
-#include "winext/named_pipe_client_details.hpp"
+#include "winasio/named_pipe_client_details.hpp"
 
 #include <list>
 #include <memory>
@@ -21,7 +21,8 @@
 
 #include <iostream> //debug
 
-namespace winext {
+namespace boost{
+namespace winasio {
 
 // maybe just a alias to stream handle
 
@@ -116,5 +117,6 @@ public:
 };
 
 } // namespace asio
+} // namespace boost
 
 #endif // ASIO_NAMED_PIPE_HPP

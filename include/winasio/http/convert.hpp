@@ -3,7 +3,8 @@
 #include "http.h"
 #include <map> // for headers
 
-namespace winext
+namespace boost{
+namespace winasio
 {
     namespace http
     {
@@ -226,4 +227,5 @@ namespace winext
             std::vector<HTTP_UNKNOWN_HEADER> trailers_buff_;
         };
     }
-}
+}  // namespace winasio
+} // namespace boost

@@ -1,15 +1,16 @@
 #pragma once
 
-#include "winext/named_pipe_protocol.hpp"
+#include "winasio/named_pipe_protocol.hpp"
 
 namespace net = boost::asio;
+namespace winnet = boost::winasio;
 
 boost::system::error_code make_client_call(std::string const &msg, std::string & reply_ret){
     boost::system::error_code ec;
 
     net::io_context io_context;
-    named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
-    named_pipe_protocol<net::io_context::executor_type>::client_pipe pipe(io_context);
+    winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
+    winnet::named_pipe_protocol<net::io_context::executor_type>::client_pipe pipe(io_context);
     pipe.connect(ep, ec, 2000/*2 sec timeout*/);
 
     if(ec.failed())

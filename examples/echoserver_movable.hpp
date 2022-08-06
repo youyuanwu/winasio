@@ -3,7 +3,7 @@
 #include <memory>
 #include <utility>
 #include "boost/asio.hpp"
-#include "winext/named_pipe_protocol.hpp"
+#include "winasio/named_pipe_protocol.hpp"
 #include "echoserver_session.hpp"
 
 // Used as example and testing
@@ -11,7 +11,7 @@
 class server_movable
 {
 public:
-  server_movable(net::io_context& io_context, named_pipe_protocol<net::io_context::executor_type>::endpoint ep)
+  server_movable(net::io_context& io_context, winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep)
     : acceptor_(io_context, ep)
   {
     do_accept();
@@ -22,7 +22,7 @@ private:
   {
     std::cout<<"do_accept"<<std::endl;
     acceptor_.async_accept(
-        [this](boost::system::error_code ec, named_pipe_protocol<net::io_context::executor_type>::server_pipe socket)
+        [this](boost::system::error_code ec, winnet::named_pipe_protocol<net::io_context::executor_type>::server_pipe socket)
         {
           if (!ec)
           {
@@ -36,5 +36,5 @@ private:
         });
   }
 
-  named_pipe_protocol<net::io_context::executor_type>::acceptor acceptor_;
+  winnet::named_pipe_protocol<net::io_context::executor_type>::acceptor acceptor_;
 };

@@ -3,11 +3,12 @@
 #include "boost/asio.hpp"
 #include <http.h>
 
-#include "winext/http/basic_http_handle.hpp"
+#include "winasio/http/basic_http_handle.hpp"
 
 #include "boost/assert.hpp"
 
-namespace winext {
+namespace boost{
+namespace winasio {
 namespace http {
 
 namespace net = boost::asio;
@@ -64,4 +65,5 @@ public:
 };
 
 } // namespace http
-} // namespace winext
+} // namespace winasio
+} // namespace boost

@@ -21,7 +21,7 @@
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
-#include <winext/named_pipe_protocol.hpp>
+#include <winasio/named_pipe_protocol.hpp>
 
 #include <cstdlib>
 #include <iostream>
@@ -32,8 +32,9 @@ namespace http = beast::http;       // from <boost/beast/http.hpp>
 namespace net = boost::asio;        // from <boost/asio.hpp>
 using tcp = net::ip::tcp;           // from <boost/asio/ip/tcp.hpp>
 
+namespace winnet = boost::winasio;
 //typedef beast::tcp_stream mystream;
-typedef winext::named_pipe_protocol<net::io_context::executor_type>::client_pipe mystream;
+typedef winnet::named_pipe_protocol<net::io_context::executor_type>::client_pipe mystream;
 
 // Performs an HTTP GET and prints the response
 int main(int argc, char** argv)

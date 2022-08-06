@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "winext/http/temp.hpp"
+#include "winasio/http/temp.hpp"
 
 #include "beast_client.hpp"
 
@@ -20,7 +20,7 @@ using tcp = net::ip::tcp;           // from <boost/asio/ip/tcp.hpp>
 TEST(HTTPServer,DISABLED_ReceiveRequest) // TODO: 
 {
     // init http module
-    winext::http::http_initializer init;
+    winnet::http::http_initializer init;
     // add https then this becomes https server
     std::wstring url = L"http://localhost:12356/winhttpapitest/";
     
@@ -28,9 +28,9 @@ TEST(HTTPServer,DISABLED_ReceiveRequest) // TODO:
     net::io_context io_context;
     
     // open queue handle
-    winext::http::basic_http_handle<net::io_context::executor_type> queue(io_context);
-    queue.assign(winext::http::open_raw_http_queue());
-    winext::http::http_simple_url simple_url(queue, url);
+    winnet::http::basic_http_handle<net::io_context::executor_type> queue(io_context);
+    queue.assign(winnet::http::open_raw_http_queue());
+    winnet::http::http_simple_url simple_url(queue, url);
 
     std::vector<BYTE> buffer(sizeof(HTTP_REQUEST) + 10, 0); // make a buffer that is smaller than the request header data
     queue.async_recieve_request(net::buffer(buffer),
@@ -77,7 +77,7 @@ TEST(HTTPServer,DISABLED_ReceiveRequest) // TODO:
 TEST(HTTPServer, server) 
 {    
    // init http module
-    winext::http::http_initializer init;
+    winnet::http::http_initializer init;
     // add https then this becomes https server
     std::wstring url = L"http://localhost:12356/winhttpapitest/";
     
@@ -85,12 +85,12 @@ TEST(HTTPServer, server)
     net::io_context io_context;
     
     // open queue handle
-    winext::http::basic_http_handle<net::io_context::executor_type> queue(io_context);
-    queue.assign(winext::http::open_raw_http_queue());
-    winext::http::http_simple_url simple_url(queue, url);
+    winnet::http::basic_http_handle<net::io_context::executor_type> queue(io_context);
+    queue.assign(winnet::http::open_raw_http_queue());
+    winnet::http::http_simple_url simple_url(queue, url);
 
-    auto handler = [](const winext::http::simple_request<std::vector<CHAR>>& request, 
-                winext::http::simple_response<std::string>& response){
+    auto handler = [](const winnet::http::simple_request<std::vector<CHAR>>& request, 
+                winnet::http::simple_response<std::string>& response){
                 // handler for testing
                 PHTTP_REQUEST req = request.get_request();
                 std::wcout << L"Got a request for url: " << req->CookedUrl.pFullUrl 

@@ -14,7 +14,7 @@
 
 #include <http.h>
 
-#include "winext/http/http.hpp"
+#include "winasio/http/http.hpp"
 
 #include <stdio.h>
 #include <string>
@@ -25,6 +25,7 @@
 #pragma comment(lib, "httpapi.lib")
 
 namespace net = boost::asio;
+namespace winnet = boost::winasio;
 
 template <typename Executor = net::any_io_executor>
 class http_connection : public std::enable_shared_from_this<http_connection<Executor>>
@@ -32,18 +33,18 @@ class http_connection : public std::enable_shared_from_this<http_connection<Exec
 public:
     typedef Executor executor_type;
 
-    http_connection(winext::http::basic_http_handle<executor_type> & queue_handle)
-        :   http_connection(queue_handle, [](const winext::http::simple_request<std::vector<CHAR>>& request, 
-                winext::http::simple_response<std::string>& response){
+    http_connection(winnet::http::basic_http_handle<executor_type> & queue_handle)
+        :   http_connection(queue_handle, [](const winnet::http::simple_request<std::vector<CHAR>>& request, 
+                winnet::http::simple_response<std::string>& response){
                 // default handler
                 response.set_status_code(503);
                 response.set_reason("Not Implemented");
             })
     { }
 
-    http_connection(winext::http::basic_http_handle<executor_type> & queue_handle,
-        std::function<void(const winext::http::simple_request<std::vector<CHAR>>&, 
-        winext::http::simple_response<std::string>&)> handler)
+    http_connection(winnet::http::basic_http_handle<executor_type> & queue_handle,
+        std::function<void(const winnet::http::simple_request<std::vector<CHAR>>&, 
+        winnet::http::simple_response<std::string>&)> handler)
         :   queue_handle_(queue_handle),
             request_(),
             response_(),
@@ -57,20 +58,20 @@ public:
         // check_deadline();
     }
 
-    // void set_handler(std::function<void(const winext::http::simple_request<std::vector<CHAR>>&, 
-    //     winext::http::simple_response<std::string>&)> handler){
+    // void set_handler(std::function<void(const winasio::http::simple_request<std::vector<CHAR>>&, 
+    //     winasio::http::simple_response<std::string>&)> handler){
     //         this->handler_ = handler;
     // }
 
 private:
     // request block
-    winext::http::simple_request<std::vector<CHAR>> request_;
+    winnet::http::simple_request<std::vector<CHAR>> request_;
     // response block
-    winext::http::simple_response<std::string> response_;
+    winnet::http::simple_response<std::string> response_;
 
-    winext::http::basic_http_handle<executor_type> & queue_handle_;
+    winnet::http::basic_http_handle<executor_type> & queue_handle_;
 
-    std::function<void(const winext::http::simple_request<std::vector<CHAR>>&, winext::http::simple_response<std::string>&)> handler_;
+    std::function<void(const winnet::http::simple_request<std::vector<CHAR>>&, winnet::http::simple_response<std::string>&)> handler_;
 
     void
     receive_request()

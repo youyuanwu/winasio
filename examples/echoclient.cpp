@@ -2,10 +2,10 @@
 #include <cstring>
 #include <iostream>
 #include "boost/asio.hpp"
-#include "winext/named_pipe_protocol.hpp"
+#include "winasio/named_pipe_protocol.hpp"
 
 namespace net = boost::asio;
-using namespace winext;
+namespace winnet = boost::winasio;
 
 enum { max_length = 1024 };
 
@@ -15,8 +15,8 @@ int main(int argc, char* argv[])
   {
     net::io_context io_context;
 
-    named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
-    named_pipe_protocol<net::io_context::executor_type>::client_pipe pipe(io_context);
+    winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
+    winnet::named_pipe_protocol<net::io_context::executor_type>::client_pipe pipe(io_context);
     pipe.connect(ep);
 
     std::cout << "Enter message: ";

@@ -6,12 +6,13 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "winext/named_pipe.hpp"
-#include "winext/named_pipe_server_details.hpp"
+#include "winasio/named_pipe.hpp"
+#include "winasio/named_pipe_server_details.hpp"
 #include "boost/asio/compose.hpp"
 #include "boost/asio/windows/basic_object_handle.hpp"
 
-namespace winext{
+namespace boost{
+namespace winasio{
 
 template <typename Executor>
 class named_pipe_acceptor{
@@ -93,5 +94,6 @@ private:
 };
 
 } // namespace asio
+} // namespace boost
 
 #endif // ASIO_NAMED_PIPE_ACCEPTOR_HPP

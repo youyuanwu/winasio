@@ -4,9 +4,10 @@
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/write.hpp>
 #include <cstdio>
-#include "winext/named_pipe_protocol.hpp"
+#include "winasio/named_pipe_protocol.hpp"
 
 namespace net = boost::asio;
+namespace winnet = boost::winasio;
 
 using net::awaitable;
 using net::co_spawn;
@@ -14,14 +15,12 @@ using net::detached;
 using net::use_awaitable;
 namespace this_coro = net::this_coro;
 
-using namespace winext;
-
 #if defined(ASIO_ENABLE_HANDLER_TRACKING)
 # define use_awaitable \
   net::use_awaitable_t(__FILE__, __LINE__, __PRETTY_FUNCTION__)
 #endif
 
-net::awaitable<void> echo(named_pipe_protocol<net::any_io_executor>::server_pipe socket)
+net::awaitable<void> echo(winnet::named_pipe_protocol<net::any_io_executor>::server_pipe socket)
 {
   std::cout << "echo invoked" << std::endl;
   try
@@ -43,11 +42,11 @@ awaitable<void> listener()
 {
   auto executor = co_await this_coro::executor;
   // tcp::acceptor acceptor(executor, {tcp::v4(), 55555});
-  named_pipe_protocol<net::any_io_executor>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
-  named_pipe_protocol<net::any_io_executor>::acceptor acceptor(executor, ep);
+  winnet::named_pipe_protocol<net::any_io_executor>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
+  winnet::named_pipe_protocol<net::any_io_executor>::acceptor acceptor(executor, ep);
   for (;;)
   {
-    named_pipe_protocol<net::any_io_executor>::server_pipe socket = co_await acceptor.async_accept(use_awaitable);
+    winnet::named_pipe_protocol<net::any_io_executor>::server_pipe socket = co_await acceptor.async_accept(use_awaitable);
      std::cout << "listener spawing" << std::endl;
     co_spawn(executor, echo(std::move(socket)), detached);
   }

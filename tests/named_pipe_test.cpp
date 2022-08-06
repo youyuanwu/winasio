@@ -11,7 +11,7 @@ void test_server(){
   auto server_count = 2; //std::thread::hardware_concurrency() * 2;
   net::io_context io_context(server_count);
 
-  named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
+  winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
 
   Server s(io_context, ep);
 

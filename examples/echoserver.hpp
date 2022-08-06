@@ -1,15 +1,14 @@
 #pragma once
 
-#include "winext/named_pipe_protocol.hpp"
+#include "winasio/named_pipe_protocol.hpp"
 #include "echoserver_session.hpp"
 
 namespace net = boost::asio;
-using namespace winext;
 
 class server
 {
 public:
-  server(net::io_context& io_context, named_pipe_protocol<net::io_context::executor_type>::endpoint ep)
+  server(net::io_context& io_context, winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep)
     : acceptor_(io_context, ep),
       pipe_(io_context)
   {
@@ -33,6 +32,6 @@ private:
         });
   }
 
-  named_pipe_protocol<net::io_context::executor_type>::acceptor acceptor_;
-  named_pipe_protocol<net::io_context::executor_type>::server_pipe pipe_;
+  winnet::named_pipe_protocol<net::io_context::executor_type>::acceptor acceptor_;
+  winnet::named_pipe_protocol<net::io_context::executor_type>::server_pipe pipe_;
 };

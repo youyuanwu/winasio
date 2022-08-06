@@ -3,11 +3,10 @@
 #include <memory>
 #include <utility>
 #include "boost/asio.hpp"
-#include "winext/named_pipe_protocol.hpp"
+#include "winasio/named_pipe_protocol.hpp"
 #include "echoserver.hpp"
 
 namespace net = boost::asio;
-using namespace winext;
 
 int main(int argc, char* argv[])
 {
@@ -16,7 +15,7 @@ int main(int argc, char* argv[])
 
     net::io_context io_context;
 
-    named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
+    winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
 
     server s(io_context, ep);
 

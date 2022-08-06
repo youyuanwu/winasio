@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
 
     net::io_context io_context;
 
-    named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
+    winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep("\\\\.\\pipe\\mynamedpipe");
 
     server_movable s(io_context, ep);
 

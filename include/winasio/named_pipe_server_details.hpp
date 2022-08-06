@@ -9,7 +9,8 @@
 
 #include <iostream>
 
-namespace winext{
+namespace boost{
+namespace winasio{
 namespace details{
 
 // For server pipe.
@@ -211,5 +212,6 @@ private:
 
 } // namespace details
 } // namespace asio
+} // namespace boost
 
 #endif //ASIO_NAMED_PIPE_DETAILS_HPP

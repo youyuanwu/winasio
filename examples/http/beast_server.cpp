@@ -18,7 +18,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/asio.hpp>
 
-#include "winext/named_pipe_protocol.hpp"
+#include "winasio/named_pipe_protocol.hpp"
 
 #include <chrono>
 #include <cstdlib>
@@ -32,10 +32,12 @@ namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
+namespace winnet = boost::winasio;
+
 // typedef tcp::acceptor myacceptor;
 // typedef tcp::socket mysocket;
-typedef winext::named_pipe_protocol<net::io_context::executor_type>::acceptor myacceptor;
-typedef winext::named_pipe_protocol<net::io_context::executor_type>::server_pipe mysocket;
+typedef winnet::named_pipe_protocol<net::io_context::executor_type>::acceptor myacceptor;
+typedef winnet::named_pipe_protocol<net::io_context::executor_type>::server_pipe mysocket;
 
 namespace my_program_state
 {

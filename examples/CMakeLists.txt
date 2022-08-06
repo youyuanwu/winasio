@@ -22,5 +22,5 @@ file(GLOB HEADERS
 foreach(exe_file ${SOURCES})
     get_filename_component(exe_name ${exe_file} NAME_WE)
     add_executable(${exe_name} ${exe_file} ${HEADERS})
-    target_link_libraries(${exe_name} PRIVATE winext)
+    target_link_libraries(${exe_name} PRIVATE winasio)
 endforeach()

@@ -5,7 +5,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-namespace winext{
+namespace boost{
+namespace winasio{
 
 namespace details{
 
@@ -81,4 +82,5 @@ inline void client_connect(boost::system::error_code & ec,
 }
 }// namespace details
 }// namespace asio
+} // namespace boost
 #endif // ASIO_NAMED_PIPE_CLIENT_DETAILS_HPP
