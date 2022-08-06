@@ -4,7 +4,7 @@
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/write.hpp>
 #include <cstdio>
-#include "winasio/named_pipe_protocol.hpp"
+#include "boost/winasio/named_pipe/named_pipe_protocol.hpp"
 
 namespace net = boost::asio;
 namespace winnet = boost::winasio;

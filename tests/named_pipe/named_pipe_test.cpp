@@ -1,8 +1,8 @@
 #include "gtest/gtest.h"
-#include "echoserver_movable.hpp"
+#include "named_pipe/echoserver_movable.hpp"
 #include "test_client.hpp"
 
-#include "echoserver.hpp"
+#include "named_pipe/echoserver.hpp"
 
 #include <semaphore>
 

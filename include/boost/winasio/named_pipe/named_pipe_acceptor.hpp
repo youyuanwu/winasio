@@ -6,8 +6,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "winasio/named_pipe.hpp"
-#include "winasio/named_pipe_server_details.hpp"
+#include "boost/winasio/named_pipe/named_pipe.hpp"
+#include "boost/winasio/named_pipe/named_pipe_server_details.hpp"
 #include "boost/asio/compose.hpp"
 #include "boost/asio/windows/basic_object_handle.hpp"
 

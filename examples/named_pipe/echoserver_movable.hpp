@@ -3,7 +3,7 @@
 #include <memory>
 #include <utility>
 #include "boost/asio.hpp"
-#include "winasio/named_pipe_protocol.hpp"
+#include "boost/winasio/named_pipe/named_pipe_protocol.hpp"
 #include "echoserver_session.hpp"
 
 // Used as example and testing

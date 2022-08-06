@@ -13,7 +13,7 @@
 #include "boost/asio/windows/stream_handle.hpp"
 #include "boost/asio/windows/overlapped_ptr.hpp"
 
-#include "winasio/named_pipe_client_details.hpp"
+#include "boost/winasio/named_pipe/named_pipe_client_details.hpp"
 
 #include <list>
 #include <memory>

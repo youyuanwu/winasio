@@ -18,7 +18,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/asio.hpp>
 
-#include "winasio/named_pipe_protocol.hpp"
+#include "boost/winasio/named_pipe/named_pipe_protocol.hpp"
 
 #include <chrono>
 #include <cstdlib>

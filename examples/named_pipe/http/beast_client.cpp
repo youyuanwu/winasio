@@ -21,7 +21,7 @@
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
-#include <winasio/named_pipe_protocol.hpp>
+#include <boost/winasio/named_pipe/named_pipe_protocol.hpp>
 
 #include <cstdlib>
 #include <iostream>
