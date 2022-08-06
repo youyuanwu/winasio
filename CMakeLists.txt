@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.14)
 
 project(winasio)
 
+# format
+include(cmake/clang-format.cmake)
+if(WINASIO_CI_FORMAT)
+    message(STATUS "Only added format target.")
+    return()
+endif()
+
 set(winasio_MAIN_PROJECT OFF)
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     set(winasio_MAIN_PROJECT ON)

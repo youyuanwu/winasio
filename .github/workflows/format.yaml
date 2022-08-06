@@ -1,0 +1,26 @@
+name: format
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-latest ]
+    steps:
+    - uses: actions/checkout@v2
+
+    # seems like cmake and clang are installed on windows runners
+    - name: check cmake exists
+      run: > 
+        cmake --version
+    
+    - name: check clang-format exists
+      run: clang-format --version
+
+    - name: cmake config
+      run: cmake -B build -DWINASIO_CI_FORMAT=1 .
+
+    - name: run clang format check
+      run: cmake --build build --target clangformat-check
