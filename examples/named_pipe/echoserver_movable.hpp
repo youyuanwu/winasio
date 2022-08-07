@@ -22,8 +22,8 @@ private:
     std::cout << "do_accept" << std::endl;
     acceptor_.async_accept(
         [this](boost::system::error_code ec,
-               winnet::named_pipe_protocol<
-                   net::io_context::executor_type>::server_pipe socket) {
+               winnet::named_pipe_protocol<net::io_context::executor_type>::pipe
+                   socket) {
           if (!ec) {
             std::cout << "do_accept handler ok. making session" << std::endl;
             std::make_shared<session>(std::move(socket))->start();

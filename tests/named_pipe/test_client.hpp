@@ -12,7 +12,7 @@ boost::system::error_code make_client_call(std::string const &msg,
   net::io_context io_context;
   winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep(
       "\\\\.\\pipe\\mynamedpipe");
-  winnet::named_pipe_protocol<net::io_context::executor_type>::client_pipe pipe(
+  winnet::named_pipe_protocol<net::io_context::executor_type>::pipe pipe(
       io_context);
   pipe.connect(ep, ec, 2000 /*2 sec timeout*/);
 

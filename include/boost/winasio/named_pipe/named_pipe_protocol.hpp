@@ -16,9 +16,7 @@ template <typename Executor = any_io_executor> class named_pipe_protocol {
 public:
   typedef named_pipe_acceptor<Executor> acceptor;
 
-  typedef server_named_pipe<Executor> server_pipe;
-
-  typedef client_named_pipe<Executor> client_pipe;
+  typedef named_pipe<Executor> pipe;
 
   typedef std::string endpoint;
 };

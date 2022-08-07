@@ -38,7 +38,7 @@ namespace winnet = boost::winasio;
 // typedef tcp::socket mysocket;
 typedef winnet::named_pipe_protocol<net::io_context::executor_type>::acceptor
     myacceptor;
-typedef winnet::named_pipe_protocol<net::io_context::executor_type>::server_pipe
+typedef winnet::named_pipe_protocol<net::io_context::executor_type>::pipe
     mysocket;
 
 namespace my_program_state {
@@ -154,10 +154,9 @@ private:
 
     http::async_write(socket_, response_,
                       [self](beast::error_code ec, std::size_t) {
-                        // TODO: replicate this for pipe
                         // self->socket_.shutdown(tcp::socket::shutdown_send,
                         // ec);
-
+                        self->socket_.shutdown(ec);
                         self->deadline_.cancel();
                       });
   }

@@ -47,7 +47,7 @@ public:
       BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code))
           AcceptToken BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
   BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(AcceptToken, void(asio::error_code))
-  async_accept(server_named_pipe<executor_type> &pipe,
+  async_accept(named_pipe<executor_type> &pipe,
                BOOST_ASIO_MOVE_ARG(AcceptToken)
                    token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
 
@@ -59,20 +59,19 @@ public:
 
   // TODO: fix move and rebind executor
   // handler signature: void(error_code, pipe)
-  template <BOOST_ASIO_COMPLETION_TOKEN_FOR(
-      void(boost::system::error_code, server_named_pipe<executor_type>))
-                MoveAcceptToken BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(
-                    executor_type)>
+  template <BOOST_ASIO_COMPLETION_TOKEN_FOR(void(
+      boost::system::error_code, named_pipe<executor_type>)) MoveAcceptToken
+                BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
   BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(MoveAcceptToken,
                                      void(boost::system::error_code,
-                                          server_named_pipe<executor_type>))
+                                          named_pipe<executor_type>))
   async_accept(BOOST_ASIO_MOVE_ARG(MoveAcceptToken)
                    token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
     // std::cout << "async_accept func" << std::endl;
 
     return boost::asio::async_compose<MoveAcceptToken,
                                       void(boost::system::error_code,
-                                           server_named_pipe<executor_type>)>(
+                                           named_pipe<executor_type>)>(
         details::async_move_accept_op<executor_type>(&this->pipe_,
                                                      this->endpoint_),
         token, this->pipe_);
@@ -83,7 +82,7 @@ public:
 private:
   const executor_type &executor_;
   // for move accept, this holds the pipe.
-  server_named_pipe<executor_type> pipe_;
+  named_pipe<executor_type> pipe_;
 
   // shared event
   boost::asio::windows::basic_object_handle<executor_type> o_;

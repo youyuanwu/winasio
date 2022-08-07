@@ -8,8 +8,7 @@ namespace winnet = boost::winasio;
 class session : public std::enable_shared_from_this<session> {
 public:
   session(
-      winnet::named_pipe_protocol<net::io_context::executor_type>::server_pipe
-          socket)
+      winnet::named_pipe_protocol<net::io_context::executor_type>::pipe socket)
       : socket_(std::move(socket)) {
     std::cout << "session constructed" << std::endl;
   }
@@ -45,8 +44,7 @@ private:
         });
   }
 
-  winnet::named_pipe_protocol<net::io_context::executor_type>::server_pipe
-      socket_;
+  winnet::named_pipe_protocol<net::io_context::executor_type>::pipe socket_;
   enum { max_length = 1024 };
   char data_[max_length];
 };

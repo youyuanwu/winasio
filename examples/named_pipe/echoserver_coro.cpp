@@ -21,7 +21,7 @@ namespace this_coro = net::this_coro;
 #endif
 
 net::awaitable<void>
-echo(winnet::named_pipe_protocol<net::any_io_executor>::server_pipe socket) {
+echo(winnet::named_pipe_protocol<net::any_io_executor>::pipe socket) {
   std::cout << "echo invoked" << std::endl;
   try {
     char data[1024];
@@ -43,7 +43,7 @@ awaitable<void> listener() {
   winnet::named_pipe_protocol<net::any_io_executor>::acceptor acceptor(executor,
                                                                        ep);
   for (;;) {
-    winnet::named_pipe_protocol<net::any_io_executor>::server_pipe socket =
+    winnet::named_pipe_protocol<net::any_io_executor>::pipe socket =
         co_await acceptor.async_accept(use_awaitable);
     std::cout << "listener spawing" << std::endl;
     co_spawn(executor, echo(std::move(socket)), detached);

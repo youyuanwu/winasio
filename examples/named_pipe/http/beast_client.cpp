@@ -34,7 +34,7 @@ using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 namespace winnet = boost::winasio;
 // typedef beast::tcp_stream mystream;
-typedef winnet::named_pipe_protocol<net::io_context::executor_type>::client_pipe
+typedef winnet::named_pipe_protocol<net::io_context::executor_type>::pipe
     mystream;
 
 // Performs an HTTP GET and prints the response

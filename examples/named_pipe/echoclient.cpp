@@ -15,8 +15,8 @@ int main(int argc, char *argv[]) {
 
     winnet::named_pipe_protocol<net::io_context::executor_type>::endpoint ep(
         "\\\\.\\pipe\\mynamedpipe");
-    winnet::named_pipe_protocol<net::io_context::executor_type>::client_pipe
-        pipe(io_context);
+    winnet::named_pipe_protocol<net::io_context::executor_type>::pipe pipe(
+        io_context);
     pipe.connect(ep);
 
     std::cout << "Enter message: ";

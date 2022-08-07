@@ -29,6 +29,5 @@ private:
 
   winnet::named_pipe_protocol<net::io_context::executor_type>::acceptor
       acceptor_;
-  winnet::named_pipe_protocol<net::io_context::executor_type>::server_pipe
-      pipe_;
+  winnet::named_pipe_protocol<net::io_context::executor_type>::pipe pipe_;
 };
