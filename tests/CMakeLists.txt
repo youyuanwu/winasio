@@ -13,4 +13,5 @@ message(STATUS "Fetching googletest")
 FetchContent_MakeAvailable(googletest)
 
 add_subdirectory(http)
+add_subdirectory(winhttp)
 add_subdirectory(named_pipe)

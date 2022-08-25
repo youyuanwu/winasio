@@ -17,7 +17,8 @@ endif()
 option(winasio_BuildTests     "Build the unit tests when BUILD_TESTING is enabled." ${winasio_MAIN_PROJECT})
 option(winasio_BuildExamples  "Build examples"                                      ${winasio_MAIN_PROJECT})
 
-find_package(Boost REQUIRED)
+set(Boost_USE_STATIC_LIBS ON) # use static boost
+find_package(Boost REQUIRED COMPONENTS log) # log is used for tests
 
 add_library(winasio INTERFACE)
 target_include_directories(winasio INTERFACE
