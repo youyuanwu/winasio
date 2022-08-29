@@ -282,6 +282,7 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+    // don't allow event wait errors.
     HANDLE hEvent = CreateEventA(NULL,  // lpEventAttributes,
                                  true,  //               bManualReset,
                                  false, //          BOOL bInitialState,
@@ -290,11 +291,13 @@ public:
     if (hEvent == NULL) {
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
-      return;
+      BOOST_LOG_TRIVIAL(debug) << "CreateEventA failed " << ec;
+      BOOST_ASSERT_MSG(!ec.failed(), "CreateEventA failed");
     }
     event_.assign(hEvent);
     event_.async_wait([](const boost::system::error_code &ec) {
-      BOOST_LOG_TRIVIAL(debug) << "request wait event triggered " << ec;
+      BOOST_LOG_TRIVIAL(debug) << "request wait event triggered: " << ec;
+      BOOST_ASSERT_MSG(!ec.failed(), "send async_wait for Event failed");
     });
     BOOST_LOG_TRIVIAL(debug) << "WinHttpSendRequest: status: " << ec;
   }
@@ -314,13 +317,16 @@ public:
   }
 
   // signal request completes
-  void complete(_Out_ boost::system::error_code &ec) {
+  void complete() {
+    BOOST_ASSERT(event_.is_open());
     bool ok = SetEvent(event_.native_handle());
     if (!ok) {
-      ec = boost::system::error_code(GetLastError(),
-                                     boost::asio::error::get_system_category());
+      boost::system::error_code ec = boost::system::error_code(
+          GetLastError(), boost::asio::error::get_system_category());
+      BOOST_LOG_TRIVIAL(debug) << "complete SetEvent failed: " << ec;
+      BOOST_ASSERT_MSG(false, "complete SetEvent failed");
     }
-    BOOST_LOG_TRIVIAL(debug) << "winasio http request complete: status: " << ec;
+    BOOST_LOG_TRIVIAL(debug) << "winasio http request complete";
   }
 
   // callback case WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE

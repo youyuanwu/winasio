@@ -230,6 +230,95 @@ private:
   asio_request_context<executor_type> ctx_;
 };
 
+namespace details {
+
+// handler of signature void(error_code, pipe)
+// handle async_recieve_response
+template <typename Executor, typename DynamicBuffer>
+class async_read_body_op : public std::enable_shared_from_this<
+                               async_read_body_op<Executor, DynamicBuffer>> {
+public:
+  typedef Executor executor_type;
+
+  async_read_body_op(basic_winhttp_request_asio_handle<executor_type> &h,
+                     DynamicBuffer &buff)
+      : h_request_(h), buff_(buff), user_token_(nullptr) {}
+
+  void run(std::function<void(boost::system::error_code, std::size_t)> token) {
+    this->user_token_ = token;
+    this->query_data();
+  }
+
+private:
+  void query_data() {
+    auto self = this->shared_from_this();
+    h_request_.async_query_data_available(
+        [self](boost::system::error_code ec, std::size_t len) {
+          BOOST_LOG_TRIVIAL(debug)
+              << "async_query_data_available handler" << ec << "len " << len;
+          if (ec || len == 0) {
+            // all data read. request finished. or errored out
+            self->complete(ec);
+            return;
+          }
+
+          self->on_query_data_available_complete(len);
+        });
+  }
+
+  void on_query_data_available_complete(std::size_t len) {
+    auto self = this->shared_from_this();
+    auto buff = this->buff_.prepare(len + 1);
+    h_request_.async_read_data(
+        (LPVOID)buff.data(), static_cast<DWORD>(len),
+        [self](boost::system::error_code ec, std::size_t len) {
+          BOOST_LOG_TRIVIAL(debug)
+              << "async_read_data handler " << ec << "len " << len;
+          if (ec) {
+            self->complete(ec);
+            return;
+          }
+          self->on_read_data_complete(len);
+        });
+  }
+
+  void on_read_data_complete(std::size_t len) {
+    if (len == 0) {
+      BOOST_ASSERT(false); // query data is 0 but somehow read happened.
+      return;
+    }
+    this->buff_.commit(len);
+    // Check for more data.
+    this->query_data();
+  }
+
+  void complete(const boost::system::error_code &ec) {
+    if (user_token_ != nullptr) {
+      net::post(h_request_.get_executor(), std::bind(user_token_, ec, 0));
+    }
+  }
+
+  basic_winhttp_request_asio_handle<executor_type> &h_request_;
+  DynamicBuffer &buff_;
+  std::function<void(boost::system::error_code, std::size_t)> user_token_;
+};
+
+} // namespace details
+
+// async read all body into buffer
+// use this in async_recieve_response handler
+// handler signature void(ec, size_t)
+template <typename Executor = net::any_io_executor, typename DynamicBuffer>
+void async_read_body(
+    basic_winhttp_request_asio_handle<Executor> &h, DynamicBuffer &buffer,
+    std::function<void(boost::system::error_code, std::size_t)> token) {
+
+  // token in constructor does not work;
+  std::make_shared<details::async_read_body_op<Executor, DynamicBuffer>>(h,
+                                                                         buffer)
+      ->run(token);
+}
+
 } // namespace http
 } // namespace winasio
 } // namespace boost

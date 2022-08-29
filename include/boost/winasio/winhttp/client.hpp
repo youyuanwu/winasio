@@ -40,11 +40,11 @@ private:
 };
 
 template <typename Executor = net::any_io_executor>
-class request2 : public std::enable_shared_from_this<request2<Executor>> {
+class request : public std::enable_shared_from_this<request<Executor>> {
 public:
   typedef Executor executor_type;
 
-  request2(const executor_type &ex) : h_request_(ex), body_(), buff_(body_) {}
+  request(const executor_type &ex) : h_request_(ex), body_(), buff_(body_) {}
 
   // synchronously open requst.
   void open(
@@ -92,7 +92,7 @@ public:
         dwTotalLength, [self](boost::system::error_code ec) {
           BOOST_LOG_TRIVIAL(debug) << "async_send handler" << ec;
           if (ec) {
-            self->cleanup(ec);
+            self->complete(ec);
             return;
           }
           self->on_send_complete();
@@ -104,57 +104,18 @@ public:
     h_request_.async_recieve_response([self](boost::system::error_code ec) {
       BOOST_LOG_TRIVIAL(debug) << "async_recieve_response handler" << ec;
       if (ec) {
-        self->cleanup(ec);
+        self->complete(ec);
         return;
       }
-      self->query_data();
+      auto token = [self](boost::system::error_code ec, std::size_t) {
+        self->complete(ec);
+      };
+      async_read_body(self->h_request_, self->buff_, token);
     });
   }
 
-  void query_data() {
-    auto self = this->shared_from_this();
-    h_request_.async_query_data_available(
-        [self](boost::system::error_code ec, std::size_t len) {
-          BOOST_LOG_TRIVIAL(debug)
-              << "async_query_data_available handler" << ec << "len " << len;
-          if (ec || len == 0) {
-            // all data read. request finished. or errored out
-            self->cleanup(ec);
-            return;
-          }
-
-          self->on_query_data_available_complete(len);
-        });
-  }
-
-  void on_query_data_available_complete(std::size_t len) {
-    auto self = this->shared_from_this();
-    auto buff = this->buff_.prepare(len + 1);
-    h_request_.async_read_data(
-        (LPVOID)buff.data(), static_cast<DWORD>(len),
-        [self](boost::system::error_code ec, std::size_t len) {
-          BOOST_LOG_TRIVIAL(debug)
-              << "async_read_data handler " << ec << "len " << len;
-          if (ec) {
-            self->cleanup(ec);
-            return;
-          }
-          self->on_read_data_complete(len);
-        });
-  }
-
-  void on_read_data_complete(std::size_t len) {
-    if (len == 0) {
-      // TODO: ??
-      return;
-    }
-    this->buff_.commit(len);
-    // Check for more data.
-    this->query_data();
-  }
-
   // ec is argument
-  void cleanup(boost::system::error_code ec) {
+  void complete(const boost::system::error_code &ec) {
     BOOST_LOG_TRIVIAL(debug) << "my request cleanup " << ec;
 
     // cleanup callback
@@ -169,8 +130,7 @@ public:
     }
 
     // notify asio request completes.
-    this->h_request_.complete(ec_internal);
-    BOOST_ASSERT(!ec_internal.failed());
+    this->h_request_.complete();
   }
 
   winnet::http::basic_winhttp_request_asio_handle<executor_type> &

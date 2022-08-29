@@ -32,7 +32,7 @@ TEST(HTTPClient, Basic) {
   const std::optional<std::string> body = std::nullopt;
 
   auto request =
-      std::make_shared<winnet::http::request2<net::io_context::executor_type>>(
+      std::make_shared<winnet::http::request<net::io_context::executor_type>>(
           io_context.get_executor());
 
   request->open(h_connect, method, path, accept, ec);
