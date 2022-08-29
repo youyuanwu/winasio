@@ -15,29 +15,42 @@ namespace winnet = boost::winasio;
 template <typename Executor> class asio_request_context {
 public:
   typedef Executor executor_type;
+  enum class state {
+    idle,
+    send_request,
+    headers_available,
+    data_available,
+    read_complete,
+    error
+  };
+
   // callbacks
   asio_request_context(const executor_type &ex)
-      : ex_(ex), on_send_request_complete(nullptr),
-        on_headers_available(nullptr), on_data_available(nullptr),
-        on_read_complete(nullptr) {}
+      : ex_(ex), on_send_request_complete(), on_headers_available(),
+        on_data_available(), on_read_complete(), state_(state::idle) {}
+
+  void set_state(state s) noexcept { state_ = s; }
+
+  state get_state() const noexcept { return state_; }
 
   // need to invoke recieve response inside
-  std::function<void(boost::system::error_code)> on_send_request_complete;
+  net::windows::overlapped_ptr on_send_request_complete;
 
   // need to invoke query data inside
-  std::function<void(boost::system::error_code)> on_headers_available;
+  net::windows::overlapped_ptr on_headers_available;
 
   // need to invoke read data inside
   // if len is 0, request ends.
-  std::function<void(boost::system::error_code, std::size_t)> on_data_available;
+  net::windows::overlapped_ptr on_data_available;
 
   // need to invoke query data inside
-  std::function<void(boost::system::error_code, std::size_t)> on_read_complete;
+  net::windows::overlapped_ptr on_read_complete;
 
   executor_type get_executor() { return ex_; }
 
 private:
   executor_type ex_;
+  state state_;
 };
 
 template <typename Executor>
@@ -45,6 +58,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
                                       DWORD dwInternetStatus,
                                       LPVOID lpvStatusInformation,
                                       DWORD dwStatusInformationLength) {
+  typedef asio_request_context<Executor>::state ctx_state_type;
   asio_request_context<Executor> *cpContext;
   cpContext = (asio_request_context<Executor> *)dwContext;
 
@@ -69,10 +83,8 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_LOG_TRIVIAL(debug) << L"DATA_AVAILABLE " << data_len;
 
     // call back needs to finish request if len is 0
-    BOOST_ASSERT(cpContext->on_data_available != nullptr);
-    net::post(cpContext->get_executor(),
-              std::bind(cpContext->on_data_available, ec, data_len));
-    cpContext->on_data_available = nullptr;
+    BOOST_ASSERT(cpContext->get_state() == ctx_state_type::data_available);
+    cpContext->on_data_available.complete(ec, data_len);
   } break;
   case WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE:
     // The response header has been received and is available with
@@ -80,10 +92,8 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_LOG_TRIVIAL(debug)
         << L"HEADERS_AVAILABLE " << dwStatusInformationLength;
     // Begin downloading the resource.
-    BOOST_ASSERT(cpContext->on_headers_available != nullptr);
-    net::post(cpContext->get_executor(),
-              std::bind(cpContext->on_headers_available, ec));
-    cpContext->on_headers_available = nullptr;
+    BOOST_ASSERT(cpContext->get_state() == ctx_state_type::headers_available);
+    cpContext->on_headers_available.complete(ec, 0);
     break;
   case WINHTTP_CALLBACK_STATUS_READ_COMPLETE:
     // Data was successfully read from the server. The lpvStatusInformation
@@ -98,22 +108,16 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_LOG_TRIVIAL(debug)
         << "READ_COMPLETE Number of bytes read" << dwStatusInformationLength;
     // Copy the data and delete the buffers.
-
-    BOOST_ASSERT(cpContext->on_read_complete != nullptr);
-    net::post(
-        cpContext->get_executor(),
-        std::bind(cpContext->on_read_complete, ec, dwStatusInformationLength));
-    cpContext->on_read_complete = nullptr;
+    BOOST_ASSERT(cpContext->get_state() == ctx_state_type::read_complete);
+    cpContext->on_read_complete.complete(ec, dwStatusInformationLength);
     break;
   case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE:
     BOOST_LOG_TRIVIAL(debug)
         << L"SENDREQUEST_COMPLETE " << dwStatusInformationLength;
 
     // Prepare the request handle to receive a response.
-    BOOST_ASSERT(cpContext->on_send_request_complete != nullptr);
-    net::post(cpContext->get_executor(),
-              std::bind(cpContext->on_send_request_complete, ec));
-    cpContext->on_send_request_complete = nullptr;
+    BOOST_ASSERT(cpContext->get_state() == ctx_state_type::send_request);
+    cpContext->on_send_request_complete.complete(ec, 0);
     break;
   default:
     BOOST_LOG_TRIVIAL(debug) << L"Unknown/unhandled callback - status "
@@ -131,6 +135,8 @@ public:
   typedef Executor executor_type;
 
   typedef basic_winhttp_request_handle<executor_type> parent_type;
+
+  typedef asio_request_context<executor_type>::state ctx_state_type;
 
   explicit basic_winhttp_request_asio_handle(const executor_type &ex)
       : basic_winhttp_request_handle<executor_type>(ex), ctx_(ex) {
@@ -167,62 +173,69 @@ public:
                  WINHTTP_FLAG_SECURE, ec);
   }
 
+  // all async handler are of type void(ec, size_t)
+
   // one needs to call sync open before send.
   // async has all the same param with sync version
   // but has handler token.
   // winttp callback case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE
+  // size_t param is not used
+  template <typename Handler>
   void async_send(LPCWSTR lpszHeaders, DWORD dwHeadersLength, LPVOID lpOptional,
                   DWORD dwOptionalLength, DWORD dwTotalLength,
-                  std::function<void(boost::system::error_code)> token) {
+                  Handler &&token) {
     boost::system::error_code ec;
     // set callback in ctx.
     // defer to winhttp to invoke callback
-    ctx_.on_send_request_complete = token;
+    ctx_.on_send_request_complete.reset(ctx_.get_executor(), std::move(token));
+    ctx_.set_state(ctx_state_type::send_request);
     parent_type::send(lpszHeaders, dwHeadersLength, lpOptional,
                       dwOptionalLength, dwTotalLength, (DWORD_PTR)&ctx_, ec);
     if (ec) {
-      net::post(this->get_executor(), std::bind(token, ec));
-      ctx_.on_send_request_complete = nullptr;
+      ctx_.set_state(ctx_state_type::error);
+      ctx_.on_send_request_complete.complete(ec, 0);
     }
   }
 
   // callback case: WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE
-  void
-  async_recieve_response(std::function<void(boost::system::error_code)> token) {
+  // size_t param is not used
+  template <typename Handler> void async_recieve_response(Handler &&token) {
     boost::system::error_code ec;
-    ctx_.on_headers_available = token;
+    ctx_.set_state(ctx_state_type::headers_available);
+    ctx_.on_headers_available.reset(ctx_.get_executor(), std::move(token));
     parent_type::receive_response(ec);
     if (ec) {
-      net::post(this->get_executor(), std::bind(token, ec));
-      ctx_.on_headers_available = nullptr;
+      ctx_.set_state(ctx_state_type::error);
+      ctx_.on_headers_available.complete(ec, 0);
     }
   }
 
   // can be invoke in async_recieve_response or ...
   // callback case : WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE
-  void async_query_data_available(
-      std::function<void(boost::system::error_code, std::size_t)> token) {
+  template <typename Handler> void async_query_data_available(Handler &&token) {
     boost::system::error_code ec;
-    ctx_.on_data_available = token;
+    ctx_.set_state(ctx_state_type::data_available);
+    ctx_.on_data_available.reset(ctx_.get_executor(), std::move(token));
     parent_type::query_data_available(NULL, ec);
     if (ec) {
-      net::post(this->get_executor(), std::bind(token, ec, 0));
-      ctx_.on_data_available = nullptr;
+      ctx_.set_state(ctx_state_type::error);
+      ctx_.on_data_available.complete(ec, 0);
     }
   }
 
   // callback case: WINHTTP_CALLBACK_STATUS_READ_COMPLETE
-  void async_read_data(
-      _Out_ LPVOID lpBuffer, _In_ DWORD dwNumberOfBytesToRead,
-      std::function<void(boost::system::error_code, size_t)> token) {
+  template <typename Handler>
+  void async_read_data(_Out_ LPVOID lpBuffer, _In_ DWORD dwNumberOfBytesToRead,
+                       Handler &&token) {
     boost::system::error_code ec;
-    ctx_.on_read_complete = token;
+    ctx_.set_state(ctx_state_type::read_complete);
+    ctx_.on_read_complete.reset(ctx_.get_executor(), std::move(token));
     parent_type::read_data(lpBuffer, dwNumberOfBytesToRead,
                            NULL, // lpdwNumberOfBytesRead
                            ec);
     if (ec) {
-      net::post(this->get_executor(), std::bind(token, ec, 0));
-      ctx_.on_read_complete = nullptr;
+      ctx_.set_state(ctx_state_type::error);
+      ctx_.on_read_complete.complete(ec, 0);
     }
   }
 
@@ -232,91 +245,73 @@ private:
 
 namespace details {
 
-// handler of signature void(error_code, pipe)
-// handle async_recieve_response
+// compose operation that reads all http body into buff
 template <typename Executor, typename DynamicBuffer>
-class async_read_body_op : public std::enable_shared_from_this<
-                               async_read_body_op<Executor, DynamicBuffer>> {
+class async_read_body_op : boost::asio::coroutine {
 public:
   typedef Executor executor_type;
-
   async_read_body_op(basic_winhttp_request_asio_handle<executor_type> &h,
                      DynamicBuffer &buff)
-      : h_request_(h), buff_(buff), user_token_(nullptr) {}
+      : h_request_(h), buff_(buff), state_(state::idle) {}
 
-  void run(std::function<void(boost::system::error_code, std::size_t)> token) {
-    this->user_token_ = token;
-    this->query_data();
+  template <typename Self>
+  void operator()(Self &self, boost::system::error_code ec = {},
+                  std::size_t len = 0) {
+    if (ec) {
+      self.complete(ec, len);
+      return;
+    }
+
+    switch (state_) {
+    case state::idle:
+      state_ = state::query_data;
+      h_request_.async_query_data_available(std::move(self));
+      break;
+    case state::query_data: {
+      if (len == 0) {
+        // no more data. request done and success
+        state_ = state::done;
+        self.complete(ec, 0); // TODO total len;
+      } else {
+        state_ = state::read_data;
+        auto buff = this->buff_.prepare(len + 1);
+        h_request_.async_read_data((LPVOID)buff.data(), static_cast<DWORD>(len),
+                                   std::move(self));
+      }
+    } break;
+    case state::read_data:
+      BOOST_ASSERT(len != 0); // data queried is not 0 but read 0
+      this->buff_.commit(len);
+      // Check for more data.
+      state_ = state::query_data;
+      h_request_.async_query_data_available(std::move(self));
+      break;
+    default:
+      BOOST_ASSERT_MSG(false, "unknown state");
+      break;
+    }
   }
 
 private:
-  void query_data() {
-    auto self = this->shared_from_this();
-    h_request_.async_query_data_available(
-        [self](boost::system::error_code ec, std::size_t len) {
-          BOOST_LOG_TRIVIAL(debug)
-              << "async_query_data_available handler" << ec << "len " << len;
-          if (ec || len == 0) {
-            // all data read. request finished. or errored out
-            self->complete(ec);
-            return;
-          }
-
-          self->on_query_data_available_complete(len);
-        });
-  }
-
-  void on_query_data_available_complete(std::size_t len) {
-    auto self = this->shared_from_this();
-    auto buff = this->buff_.prepare(len + 1);
-    h_request_.async_read_data(
-        (LPVOID)buff.data(), static_cast<DWORD>(len),
-        [self](boost::system::error_code ec, std::size_t len) {
-          BOOST_LOG_TRIVIAL(debug)
-              << "async_read_data handler " << ec << "len " << len;
-          if (ec) {
-            self->complete(ec);
-            return;
-          }
-          self->on_read_data_complete(len);
-        });
-  }
-
-  void on_read_data_complete(std::size_t len) {
-    if (len == 0) {
-      BOOST_ASSERT(false); // query data is 0 but somehow read happened.
-      return;
-    }
-    this->buff_.commit(len);
-    // Check for more data.
-    this->query_data();
-  }
-
-  void complete(const boost::system::error_code &ec) {
-    if (user_token_ != nullptr) {
-      net::post(h_request_.get_executor(), std::bind(user_token_, ec, 0));
-    }
-  }
-
   basic_winhttp_request_asio_handle<executor_type> &h_request_;
   DynamicBuffer &buff_;
-  std::function<void(boost::system::error_code, std::size_t)> user_token_;
+  enum class state { idle, query_data, read_data, done } state_;
 };
-
 } // namespace details
 
 // async read all body into buffer
 // use this in async_recieve_response handler
 // handler signature void(ec, size_t)
-template <typename Executor = net::any_io_executor, typename DynamicBuffer>
-void async_read_body(
-    basic_winhttp_request_asio_handle<Executor> &h, DynamicBuffer &buffer,
-    std::function<void(boost::system::error_code, std::size_t)> token) {
-
-  // token in constructor does not work;
-  std::make_shared<details::async_read_body_op<Executor, DynamicBuffer>>(h,
-                                                                         buffer)
-      ->run(token);
+template <typename Executor, typename DynamicBuffer,
+          BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
+                                               std::size_t))
+              Token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(Executor)>
+auto async_read_body(basic_winhttp_request_asio_handle<Executor> &h,
+                     DynamicBuffer &buffer, Token &&token) {
+  return boost::asio::async_compose<Token, void(boost::system::error_code,
+                                                std::size_t)>(
+      details::async_read_body_op<Executor, DynamicBuffer>(h, buffer), token,
+      h.get_executor());
 }
 
 } // namespace http

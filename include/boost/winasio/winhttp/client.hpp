@@ -39,6 +39,7 @@ private:
   boost::asio::dynamic_vector_buffer<BYTE, std::allocator<BYTE>> &buff_;
 };
 
+// TODO: convert this to compose operation
 template <typename Executor = net::any_io_executor>
 class request : public std::enable_shared_from_this<request<Executor>> {
 public:
@@ -89,7 +90,7 @@ public:
     user_token_ = token;
     h_request_.async_send(
         lpszHeaders, dwHeadersLength, lpOptional, dwOptionalLength,
-        dwTotalLength, [self](boost::system::error_code ec) {
+        dwTotalLength, [self](boost::system::error_code ec, std::size_t) {
           BOOST_LOG_TRIVIAL(debug) << "async_send handler" << ec;
           if (ec) {
             self->complete(ec);
@@ -101,17 +102,18 @@ public:
 
   void on_send_complete() {
     auto self = this->shared_from_this();
-    h_request_.async_recieve_response([self](boost::system::error_code ec) {
-      BOOST_LOG_TRIVIAL(debug) << "async_recieve_response handler" << ec;
-      if (ec) {
-        self->complete(ec);
-        return;
-      }
-      auto token = [self](boost::system::error_code ec, std::size_t) {
-        self->complete(ec);
-      };
-      async_read_body(self->h_request_, self->buff_, token);
-    });
+    h_request_.async_recieve_response(
+        [self](boost::system::error_code ec, std::size_t) {
+          BOOST_LOG_TRIVIAL(debug) << "async_recieve_response handler" << ec;
+          if (ec) {
+            self->complete(ec);
+            return;
+          }
+          auto token = [self](boost::system::error_code ec, std::size_t) {
+            self->complete(ec);
+          };
+          async_read_body(self->h_request_, self->buff_, token);
+        });
   }
 
   // ec is argument
