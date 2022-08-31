@@ -12,6 +12,15 @@ namespace http {
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
 
+// Dev note: when those optr are reset with a token(in user thread), the
+// executor has an entry for this token and will wait for complete to be called
+// on optr(from winhttp thread). So the contract between user init/send thread
+// and winhttp callback thread are synchronized by this optr, and internally
+// should be backed by a iocp. Original implementation added a event object on
+// the h_request, and the event is created when request is sent, and executor
+// must wait for the complete signal for this event which user needs to invoke
+// when request is done. This is no longer needed and has been removed.
+
 template <typename Executor> class asio_request_context {
 public:
   typedef Executor executor_type;

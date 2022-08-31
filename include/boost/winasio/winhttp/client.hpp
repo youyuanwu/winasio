@@ -10,144 +10,139 @@ namespace http {
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
 
-// response to be filled, and exposed to user
-template <typename Executor = net::any_io_executor> class response {
+class payload {
+public:
+  bool secure;
+  std::wstring method;
+  std::optional<std::wstring> path;
+  std::optional<winnet::http::header::accept_types> accept;
+  std::optional<winnet::http::header::headers> header;
+  std::optional<std::string> body;
+};
+
+namespace details {
+
+// compose operation that reads all http body into buff
+template <typename Executor, typename DynamicBuffer>
+class async_exec_op : boost::asio::coroutine {
 public:
   typedef Executor executor_type;
-  response(
-      winnet::http::basic_winhttp_request_asio_handle<executor_type> &h_request,
-      boost::asio::dynamic_vector_buffer<BYTE, std::allocator<BYTE>> &buff)
-      : h_request_(h_request), buff_(buff) {}
+  async_exec_op(basic_winhttp_request_asio_handle<executor_type> &h,
+                DynamicBuffer &buff, LPCWSTR lpszHeaders, DWORD dwHeadersLength,
+                LPVOID lpOptional, DWORD dwOptionalLength, DWORD dwTotalLength)
+      : h_(h), buff_(buff), lpszHeaders_(lpszHeaders),
+        dwHeadersLength_(dwHeadersLength), lpOptional_(lpOptional),
+        dwOptionalLength_(dwOptionalLength), dwTotalLength_(dwTotalLength),
+        state_(state::idle) {}
 
-  // get view of body
-  net::const_buffers_1 get_body() { return buff_.data(); }
+  template <typename Self>
+  void operator()(Self &self, boost::system::error_code ec = {},
+                  std::size_t len = 0) {
+    if (ec) {
+      self.complete(ec, len);
+      return;
+    }
 
-  winnet::http::basic_winhttp_request_asio_handle<executor_type> &get_handle() {
-    return h_request_;
-  }
-
-  std::string get_body_str() {
-    // TODO: invalidate buffer?
-    auto resp_body = get_body();
-    auto view = resp_body.data();
-    auto size = resp_body.size();
-    return std::string((BYTE *)view, (BYTE *)view + size);
+    switch (state_) {
+    case state::idle:
+      state_ = state::send;
+      h_.async_send(lpszHeaders_, dwHeadersLength_, lpOptional_,
+                    dwOptionalLength_, dwTotalLength_, std::move(self));
+      break;
+    case state::send:
+      state_ = state::receive_response;
+      h_.async_recieve_response(std::move(self));
+      break;
+    case state::receive_response:
+      // read body and finish
+      state_ = state::done;
+      async_read_body(h_, buff_, std::move(self));
+      break;
+    case state::done:
+      self.complete(ec, 0);
+      break;
+    default:
+      BOOST_ASSERT_MSG(false, "unknown state");
+      break;
+    }
   }
 
 private:
-  winnet::http::basic_winhttp_request_asio_handle<executor_type> &h_request_;
-  boost::asio::dynamic_vector_buffer<BYTE, std::allocator<BYTE>> &buff_;
+  basic_winhttp_request_asio_handle<executor_type> &h_;
+  DynamicBuffer &buff_;
+  LPCWSTR lpszHeaders_;
+  DWORD dwHeadersLength_;
+  LPVOID lpOptional_;
+  DWORD dwOptionalLength_;
+  DWORD dwTotalLength_;
+  enum class state { idle, send, receive_response, done } state_;
 };
+} // namespace details
 
-// TODO: convert this to compose operation
-template <typename Executor = net::any_io_executor>
-class request : public std::enable_shared_from_this<request<Executor>> {
-public:
-  typedef Executor executor_type;
+template <typename Executor, typename DynamicBuffer,
+          BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
+                                               std::size_t))
+              Token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(Executor)>
+void async_exec(
+    payload &p, winnet::http::basic_winhttp_connect_handle<Executor> &h_connect,
+    winnet::http::basic_winhttp_request_asio_handle<Executor> &h_request,
+    DynamicBuffer &buffer, Token &&token) {
+  boost::system::error_code ec;
 
-  request(const executor_type &ex) : h_request_(ex), body_(), buff_(body_) {}
-
-  // synchronously open requst.
-  void open(
-      _In_ winnet::http::basic_winhttp_connect_handle<executor_type> &h_connect,
-      const std::wstring &method, const std::optional<std::wstring> &path,
-      winnet::http::header::accept_types &accept,
-      _Out_ boost::system::error_code &ec) {
-    LPCWSTR ppath = NULL;
-    if (path) {
-      ppath = path->c_str();
-    }
-    h_request_.managed_open(
-        h_connect.native_handle(), method.c_str(), ppath, NULL, // http 1.1
-        WINHTTP_NO_REFERER, (LPCWSTR *)accept.get(), WINHTTP_FLAG_SECURE, ec);
+  LPCWSTR ppath = NULL;
+  if (p.path) {
+    ppath = p.path->c_str();
+  }
+  LPCWSTR *p_accept = NULL;
+  if (p.accept) {
+    p_accept = (LPCWSTR *)p.accept->get();
+  }
+  DWORD flags = 0;
+  if (p.secure) {
+    flags |= WINHTTP_FLAG_SECURE;
   }
 
-  // wraper for simple api
-  void async_exec(
-      const winnet::http::header::headers &header,
-      const std::optional<std::string> &body,
-      std::function<void(boost::system::error_code, response<executor_type> &)>
-          token) {
-
-    LPVOID pbody = WINHTTP_NO_REQUEST_DATA;
-    DWORD body_len = 0;
-    if (body) {
-      pbody = (LPVOID)body->data();
-      body_len = static_cast<DWORD>(body->size());
-    }
-
-    this->async_exec(header.get(), header.size(), pbody, body_len, body_len,
-                     token);
+  // open request
+  h_request.managed_open(h_connect.native_handle(), p.method.c_str(), ppath,
+                         NULL, // http 1.1
+                         WINHTTP_NO_REFERER, p_accept, flags, ec);
+  if (ec) {
+    net::post(h_request.get_executor(), std::bind(token, ec, 0));
+    return;
   }
 
-  // start send request until end
-  void async_exec(
-      LPCWSTR lpszHeaders, DWORD dwHeadersLength, LPVOID lpOptional,
-      DWORD dwOptionalLength, DWORD dwTotalLength,
-      std::function<void(boost::system::error_code, response<executor_type> &)>
-          token) {
-    auto self = this->shared_from_this();
-    user_token_ = token;
-    h_request_.async_send(
-        lpszHeaders, dwHeadersLength, lpOptional, dwOptionalLength,
-        dwTotalLength, [self](boost::system::error_code ec, std::size_t) {
-          BOOST_LOG_TRIVIAL(debug) << "async_send handler" << ec;
-          if (ec) {
-            self->complete(ec);
-            return;
-          }
-          self->on_send_complete();
-        });
+  LPCWSTR lpszHeaders = NULL;
+  DWORD dwHeadersLength = 0;
+  if (p.header) {
+    lpszHeaders = p.header->get();
+    dwHeadersLength = static_cast<DWORD>(p.header->size());
   }
 
-  void on_send_complete() {
-    auto self = this->shared_from_this();
-    h_request_.async_recieve_response(
-        [self](boost::system::error_code ec, std::size_t) {
-          BOOST_LOG_TRIVIAL(debug) << "async_recieve_response handler" << ec;
-          if (ec) {
-            self->complete(ec);
-            return;
-          }
-          auto token = [self](boost::system::error_code ec, std::size_t) {
-            self->complete(ec);
-          };
-          async_read_body(self->h_request_, self->buff_, token);
-        });
+  LPVOID lpOptional = WINHTTP_NO_REQUEST_DATA;
+  DWORD dwOptionalLength = 0;
+  if (p.body) {
+    lpOptional = (LPVOID)p.body->data();
+    dwOptionalLength = static_cast<DWORD>(p.body->size());
   }
+  DWORD dwTotalLength = dwOptionalLength; // the same for now.
 
-  // ec is argument
-  void complete(const boost::system::error_code &ec) {
-    BOOST_LOG_TRIVIAL(debug) << "my request cleanup " << ec;
+  // send request
+  return boost::asio::async_compose<Token, void(boost::system::error_code,
+                                                std::size_t)>(
+      details::async_exec_op<Executor, DynamicBuffer>(
+          h_request, buffer, lpszHeaders, dwHeadersLength, lpOptional,
+          dwOptionalLength, dwTotalLength),
+      token, h_request.get_executor());
+}
 
-    // cleanup callback
-    boost::system::error_code ec_internal;
-    this->h_request_.set_status_callback(NULL, ec_internal);
-    BOOST_ASSERT(!ec_internal.failed());
-
-    // invoke user callback if exists
-    if (user_token_) {
-      net::post(h_request_.get_executor(),
-                std::bind(user_token_, ec, response(h_request_, buff_)));
-    }
-
-    // notify asio request completes.
-    this->h_request_.complete();
-  }
-
-  winnet::http::basic_winhttp_request_asio_handle<executor_type> &
-  get_request_handle() {
-    return h_request_;
-  }
-
-private:
-  winnet::http::basic_winhttp_request_asio_handle<executor_type> h_request_;
-  std::vector<BYTE> body_;
-  boost::asio::dynamic_vector_buffer<BYTE, std::allocator<BYTE>> buff_;
-
-  std::function<void(boost::system::error_code, response<executor_type> &)>
-      user_token_;
-};
+// helper to convert dynamic buff to string
+template <typename DynamicBuffer>
+std::string buff_to_string(DynamicBuffer &buff) {
+  auto resp_body = buff.data();
+  auto view = resp_body.data();
+  auto size = resp_body.size();
+  return std::string((BYTE *)view, (BYTE *)view + size);
+}
 
 } // namespace http
 } // namespace winasio

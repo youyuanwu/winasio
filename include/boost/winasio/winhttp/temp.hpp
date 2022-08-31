@@ -30,7 +30,8 @@ public:
     ec.clear();
 
     // notify asio request completes.
-    this->h_request.complete();
+    // This is broken already by new version.
+    // this->h_request.complete();
   }
 
   bool header(_Out_ boost::system::error_code &ec) {

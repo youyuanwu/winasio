@@ -25,33 +25,32 @@ TEST(HTTPClient, Basic) {
                     url.get_port(), ec);
   ASSERT_FALSE(ec.failed());
 
-  const std::wstring method = L"GET";
-  const std::optional<std::wstring> path = std::nullopt;
-  const winnet::http::header::headers hd;         // empty
-  winnet::http::header::accept_types accept = {}; // empty
-  const std::optional<std::string> body = std::nullopt;
+  winnet::http::payload pl;
+  pl.method = L"GET";
+  pl.path = std::nullopt;
+  pl.header = std::nullopt;
+  pl.accept = std::nullopt;
+  pl.body = std::nullopt;
+  pl.secure = true;
 
-  auto request =
-      std::make_shared<winnet::http::request<net::io_context::executor_type>>(
-          io_context.get_executor());
+  winnet::http::basic_winhttp_request_asio_handle<
+      net::io_context::executor_type>
+      h_request(io_context.get_executor());
 
-  request->open(h_connect, method, path, accept, ec);
-  ASSERT_FALSE(ec.failed());
-
-  request->async_exec(
-      hd, body,
-      [](boost::system::error_code ec,
-         winnet::http::response<net::io_context::executor_type> &resp) {
+  std::vector<BYTE> body_buff;
+  auto buff = net::dynamic_buffer(body_buff);
+  winnet::http::async_exec(
+      pl, h_connect, h_request, buff,
+      [&h_request, &buff](boost::system::error_code ec, std::size_t) {
         BOOST_LOG_TRIVIAL(debug) << "async_exec handler";
         ASSERT_FALSE(ec.failed());
 
-        auto &h_request = resp.get_handle();
         // print result
         std::wstring headers;
         winnet::http::header::get_all_raw_crlf(h_request, ec, headers);
         ASSERT_FALSE(ec.failed());
         BOOST_LOG_TRIVIAL(debug) << headers;
-        BOOST_LOG_TRIVIAL(debug) << resp.get_body_str();
+        BOOST_LOG_TRIVIAL(debug) << winnet::http::buff_to_string(buff);
 
         // more tests
         // check status
@@ -69,6 +68,5 @@ TEST(HTTPClient, Basic) {
         ASSERT_EQ(L"application/json; charset=utf-8", content_type);
       });
 
-  // wait for event
   io_context.run();
 }
