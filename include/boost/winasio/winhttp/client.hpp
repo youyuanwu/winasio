@@ -5,7 +5,7 @@
 
 namespace boost {
 namespace winasio {
-namespace http {
+namespace winhttp {
 
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
@@ -15,8 +15,8 @@ public:
   bool secure;
   std::wstring method;
   std::optional<std::wstring> path;
-  std::optional<winnet::http::header::accept_types> accept;
-  std::optional<winnet::http::header::headers> header;
+  std::optional<header::accept_types> accept;
+  std::optional<header::headers> header;
   std::optional<std::string> body;
 };
 
@@ -83,10 +83,9 @@ template <typename Executor, typename DynamicBuffer,
           BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
                                                std::size_t))
               Token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(Executor)>
-void async_exec(
-    payload &p, winnet::http::basic_winhttp_connect_handle<Executor> &h_connect,
-    winnet::http::basic_winhttp_request_asio_handle<Executor> &h_request,
-    DynamicBuffer &buffer, Token &&token) {
+void async_exec(payload &p, basic_winhttp_connect_handle<Executor> &h_connect,
+                basic_winhttp_request_asio_handle<Executor> &h_request,
+                DynamicBuffer &buffer, Token &&token) {
   boost::system::error_code ec;
 
   LPCWSTR ppath = NULL;
@@ -144,6 +143,6 @@ std::string buff_to_string(DynamicBuffer &buff) {
   return std::string((BYTE *)view, (BYTE *)view + size);
 }
 
-} // namespace http
+} // namespace winhttp
 } // namespace winasio
 } // namespace boost

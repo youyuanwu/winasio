@@ -3,7 +3,7 @@
 // temporary implementations.
 namespace boost {
 namespace winasio {
-namespace http {
+namespace winhttp {
 
 namespace net = boost::asio;
 namespace winnet = boost::winasio;
@@ -37,7 +37,7 @@ public:
   bool header(_Out_ boost::system::error_code &ec) {
     std::wstring all_headers;
 
-    winnet::http::header::get_all_raw_crlf(this->h_request, ec, all_headers);
+    header::get_all_raw_crlf(this->h_request, ec, all_headers);
 
     if (!ec) {
       BOOST_LOG_TRIVIAL(debug) << all_headers;
@@ -60,8 +60,7 @@ public:
     return !ec.failed();
   }
 
-  winnet::http::basic_winhttp_request_handle<net::io_context::executor_type>
-      h_request;
+  basic_winhttp_request_handle<net::io_context::executor_type> h_request;
 
   DynamicBuffer &buff_;
   boost::system::error_code ec; // final error from request
@@ -271,7 +270,7 @@ void __stdcall AsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     WINHTTP_ASYNC_RESULT *pAR = (WINHTTP_ASYNC_RESULT *)lpvStatusInformation;
 
     std::wstring err;
-    winnet::http::error::get_api_error_str(pAR, err);
+    winnet::winhttp::error::get_api_error_str(pAR, err);
     BOOST_LOG_TRIVIAL(debug) << err;
     // Error ERROR_INTERNET_NAME_NOT_RESOLVED
     // if (pAR->dwError == 0x12027) {
@@ -323,7 +322,7 @@ void __stdcall AsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     // Layer (SSL) certificate from the server.
     if (lpvStatusInformation) {
       std::wstring err;
-      winnet::http::error::get_secure_failure_err_str(
+      winnet::winhttp::error::get_secure_failure_err_str(
           *(DWORD *)lpvStatusInformation, err);
       BOOST_LOG_TRIVIAL(debug) << err;
     } else {
@@ -393,6 +392,6 @@ void __stdcall AsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
   }
 }
 
-} // namespace http
+} // namespace winhttp
 } // namespace winasio
 } // namespace boost

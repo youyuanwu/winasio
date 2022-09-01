@@ -1,5 +1,7 @@
 #include "boost/asio.hpp"
 #include "boost/winasio/winhttp/winhttp.hpp"
+// include temp impl/application of winhttp
+#include "boost\winasio\winhttp\temp.hpp"
 #include "gtest/gtest.h"
 
 #include <iostream>
@@ -12,7 +14,7 @@ TEST(HTTPClient, DISABLED_MyTest) {
   boost::system::error_code ec;
   net::io_context io_context;
 
-  winnet::http::basic_winhttp_session_handle<net::io_context::executor_type>
+  winnet::winhttp::basic_winhttp_session_handle<net::io_context::executor_type>
       h_session(io_context);
   h_session.open(ec); // by default async session is created
   ASSERT_FALSE(ec.failed());
@@ -20,13 +22,13 @@ TEST(HTTPClient, DISABLED_MyTest) {
   std::vector<BYTE> data(0);
   auto buff = net::dynamic_buffer(data);
 
-  winnet::http::url_component url;
+  winnet::winhttp::url_component url;
   url.crack(L"https://api.github.com:443", ec);
   ASSERT_FALSE(ec.failed());
 
-  winnet::http::REQUEST_CONTEXT rcContext(io_context.get_executor(), buff);
+  winnet::winhttp::REQUEST_CONTEXT rcContext(io_context.get_executor(), buff);
 
-  winnet::http::basic_winhttp_connect_handle<net::io_context::executor_type>
+  winnet::winhttp::basic_winhttp_connect_handle<net::io_context::executor_type>
       h_connect(io_context);
   h_connect.connect(h_session.native_handle(), url.get_hostname().c_str(),
                     url.get_port(), ec);
@@ -36,7 +38,8 @@ TEST(HTTPClient, DISABLED_MyTest) {
   ASSERT_FALSE(ec.failed());
 
   rcContext.h_request.set_status_callback(
-      (WINHTTP_STATUS_CALLBACK)winnet::http::AsyncCallback<decltype(buff)>, ec);
+      (WINHTTP_STATUS_CALLBACK)winnet::winhttp::AsyncCallback<decltype(buff)>,
+      ec);
   ASSERT_FALSE(ec.failed());
 
   rcContext.h_request.send(WINHTTP_NO_ADDITIONAL_HEADERS, 0,
@@ -51,15 +54,17 @@ TEST(HTTPClient, DISABLED_MyTest) {
 
   // check status
   DWORD dwStatusCode;
-  winnet::http::header::get_status_code(rcContext.h_request, ec, dwStatusCode);
+  winnet::winhttp::header::get_status_code(rcContext.h_request, ec,
+                                           dwStatusCode);
   ASSERT_EQ(boost::system::errc::success, ec);
   ASSERT_EQ(200, dwStatusCode);
   std::wstring version;
-  winnet::http::header::get_version(rcContext.h_request, ec, version);
+  winnet::winhttp::header::get_version(rcContext.h_request, ec, version);
   ASSERT_EQ(boost::system::errc::success, ec);
   ASSERT_EQ(L"HTTP/1.1", version);
   std::wstring content_type;
-  winnet::http::header::get_content_type(rcContext.h_request, ec, content_type);
+  winnet::winhttp::header::get_content_type(rcContext.h_request, ec,
+                                            content_type);
   ASSERT_EQ(boost::system::errc::success, ec);
   ASSERT_EQ(L"application/json; charset=utf-8", content_type);
   // print result;
@@ -68,7 +73,7 @@ TEST(HTTPClient, DISABLED_MyTest) {
 
 TEST(HTTPClient, CrackURL) {
   boost::system::error_code ec;
-  winnet::http::url_component x;
+  winnet::winhttp::url_component x;
   x.crack(L"https://www.google.com:12345/person?name=john", ec);
   ASSERT_FALSE(ec.failed());
   ASSERT_EQ(L"www.google.com", x.get_hostname());
@@ -96,7 +101,7 @@ TEST(HTTPClient, ASIOBuff) {
 }
 
 TEST(HTTPClient, AcceptType) {
-  winnet::http::header::accept_types at = {L"application/json"};
+  winnet::winhttp::header::accept_types at = {L"application/json"};
   const LPCWSTR *data = at.get();
   ASSERT_EQ(*data, std::wstring(L"application/json"));
   ASSERT_EQ(*(data + 1), nullptr);
@@ -104,12 +109,12 @@ TEST(HTTPClient, AcceptType) {
 
 TEST(HTTPClient, AdditionalHeaders) {
 
-  winnet::http::header::headers hs;
+  winnet::winhttp::header::headers hs;
   hs.add(L"myheader1", L"myval1").add(L"myheader2", L"myval2");
 
   ASSERT_EQ(L"myheader1: myval1\r\nmyheader2: myval2", std::wstring(hs.get()));
 
-  winnet::http::header::headers hs0; // empty
+  winnet::winhttp::header::headers hs0; // empty
   ASSERT_EQ(nullptr, hs0.get());
   ASSERT_EQ(0, hs0.size());
 }

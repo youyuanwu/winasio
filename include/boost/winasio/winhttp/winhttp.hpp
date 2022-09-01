@@ -16,7 +16,7 @@
 
 namespace boost {
 namespace winasio {
-namespace http {
+namespace winhttp {
 namespace net = boost::asio;
 // namespace winnet = net::windows;
 
@@ -564,9 +564,6 @@ inline void get_api_error_str(_In_ WINHTTP_ASYNC_RESULT *pAR,
 
 } // namespace error
 
-} // namespace http
+} // namespace winhttp
 } // namespace winasio
 } // namespace boost
-
-// include temp impl/application of winhttp
-#include "boost\winasio\winhttp\temp.hpp"

@@ -7,7 +7,7 @@
 
 namespace boost {
 namespace winasio {
-namespace http {
+namespace winhttp {
 
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
@@ -164,8 +164,7 @@ public:
     }
     // using managed callback
     this->set_status_callback(
-        (WINHTTP_STATUS_CALLBACK)
-            winnet::http::BasicAsioAsyncCallback<executor_type>,
+        (WINHTTP_STATUS_CALLBACK)BasicAsioAsyncCallback<executor_type>,
         WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS, ec);
     if (ec) {
       return;
@@ -323,6 +322,6 @@ auto async_read_body(basic_winhttp_request_asio_handle<Executor> &h,
       h.get_executor());
 }
 
-} // namespace http
+} // namespace winhttp
 } // namespace winasio
 } // namespace boost
