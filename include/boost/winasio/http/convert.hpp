@@ -8,8 +8,9 @@ namespace boost {
 namespace winasio {
 namespace http {
 
-void get_known_headers_all(PHTTP_REQUEST req,
-                           std::map<HTTP_HEADER_ID, std::string> &headers) {
+inline void
+get_known_headers_all(PHTTP_REQUEST req,
+                      std::map<HTTP_HEADER_ID, std::string> &headers) {
   PHTTP_KNOWN_HEADER known_headers = req->Headers.KnownHeaders;
   size_t count =
       sizeof(req->Headers.KnownHeaders) / sizeof(req->Headers.KnownHeaders[0]);
@@ -25,8 +26,8 @@ void get_known_headers_all(PHTTP_REQUEST req,
 
 // query a paticular known header.
 // return true if found
-bool query_known_header(PHTTP_REQUEST req, HTTP_HEADER_ID id,
-                        std::string &val) {
+inline bool query_known_header(PHTTP_REQUEST req, HTTP_HEADER_ID id,
+                               std::string &val) {
   PHTTP_KNOWN_HEADER known_headers = req->Headers.KnownHeaders;
   HTTP_KNOWN_HEADER &header = known_headers[id];
   if (header.RawValueLength == 0) {
@@ -36,8 +37,9 @@ bool query_known_header(PHTTP_REQUEST req, HTTP_HEADER_ID id,
   return true;
 }
 
-void get_unknown_headers_all(PHTTP_REQUEST req,
-                             std::map<std::string, std::string> &headers) {
+inline void
+get_unknown_headers_all(PHTTP_REQUEST req,
+                        std::map<std::string, std::string> &headers) {
   size_t count = req->Headers.UnknownHeaderCount;
   if (count == 0) {
     return;
@@ -50,8 +52,7 @@ void get_unknown_headers_all(PHTTP_REQUEST req,
   }
 }
 
-// buffer type is typically vector<byte>
-template <typename BufferType> class simple_request {
+class simple_request {
 public:
   simple_request()
       : // request_buffer_(sizeof(HTTP_REQUEST) + 2048, 0),
@@ -59,21 +60,25 @@ public:
         dynamic_request_buff_(request_buffer_),
         dynamic_body_buff_(body_buffer_) {}
 
-  auto &get_request_dynamic_buffer() { return this->dynamic_request_buff_; }
+  inline auto &get_request_dynamic_buffer() {
+    return this->dynamic_request_buff_;
+  }
 
-  auto &get_body_dynamic_buffer() { return this->dynamic_body_buff_; }
+  inline auto &get_body_dynamic_buffer() { return this->dynamic_body_buff_; }
 
   // const BufferType &get_body_buffer() const { return this->body_buffer_; }
 
-  PHTTP_REQUEST get_request() const {
+  inline PHTTP_REQUEST get_request() const {
     auto buff = this->dynamic_request_buff_.data();
     return phttp_request(buff);
   }
 
-  HTTP_REQUEST_ID get_request_id() { return this->get_request()->RequestId; }
+  inline HTTP_REQUEST_ID get_request_id() {
+    return this->get_request()->RequestId;
+  }
 
   // return body as string
-  std::string get_body_string() const {
+  inline std::string get_body_string() const {
     auto body = dynamic_body_buff_.data();
     auto view = body.data();
     auto size = body.size();
@@ -81,16 +86,14 @@ public:
   }
 
 private:
-  BufferType request_buffer_; // buffer that backs request
+  std::vector<CHAR> request_buffer_; // buffer that backs request
   net::dynamic_vector_buffer<CHAR, std::allocator<CHAR>>
-      dynamic_request_buff_; // dynamic buff wrapper for request
-  BufferType body_buffer_;   // buffer to hold body
+      dynamic_request_buff_;      // dynamic buff wrapper for request
+  std::vector<CHAR> body_buffer_; // buffer to hold body
   net::dynamic_vector_buffer<CHAR, std::allocator<CHAR>> dynamic_body_buff_;
 };
 
-template <typename BufferType>
-std::ostream &operator<<(std::ostream &os,
-                         simple_request<BufferType> const &m) {
+inline std::ostream &operator<<(std::ostream &os, simple_request const &m) {
 
   PHTTP_REQUEST req = m.get_request();
   std::map<HTTP_HEADER_ID, std::string> known_headers;
@@ -109,37 +112,38 @@ std::ostream &operator<<(std::ostream &os,
   return os;
 }
 
-// buffer type is typically std::string
-template <typename BufferType> class simple_response {
+class simple_response {
 public:
   simple_response()
       : resp_(), data_chunks_(), reason_(), body_(), known_headers_(),
         unknown_headers_() {}
 
-  void set_reason(const std::string &reason) { reason_ = reason; }
+  inline void set_reason(const std::string &reason) { reason_ = reason; }
 
-  void set_content_type(const std::string &content_type) {
+  inline void set_content_type(const std::string &content_type) {
     // content_type_ = content_type;
     this->add_known_header(HttpHeaderContentType, content_type);
   }
 
-  void set_status_code(USHORT status_code) { status_code_ = status_code; }
+  inline void set_status_code(USHORT status_code) {
+    status_code_ = status_code;
+  }
 
-  void set_body(const BufferType &body) { body_ = body; }
+  inline void set_body(const std::string &body) { body_ = body; }
 
-  void add_known_header(HTTP_HEADER_ID id, std::string data) {
+  inline void add_known_header(HTTP_HEADER_ID id, std::string data) {
     this->known_headers_[id] = data;
   }
 
-  void add_unknown_header(std::string name, std::string val) {
+  inline void add_unknown_header(std::string name, std::string val) {
     this->unknown_headers_[name] = val;
   }
 
-  void add_trailer(std::string name, std::string val) {
+  inline void add_trailer(std::string name, std::string val) {
     this->trailers_[name] = val;
   }
 
-  PHTTP_RESPONSE get_response() {
+  inline PHTTP_RESPONSE get_response() {
     // prepare response and then return ther ptr
     resp_.StatusCode = status_code_;
     resp_.pReason = reason_.data();
@@ -214,7 +218,7 @@ private:
   std::vector<HTTP_DATA_CHUNK> data_chunks_;
   std::string reason_;
   USHORT status_code_;
-  BufferType body_;
+  std::string body_;
   std::map<HTTP_HEADER_ID, std::string> known_headers_;
   std::map<std::string, std::string>
       unknown_headers_; // this takes ownership of string

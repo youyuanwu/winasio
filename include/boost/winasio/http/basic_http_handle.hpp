@@ -155,7 +155,6 @@ public:
                                      optr.get());
     boost::system::error_code ec;
     if (result == ERROR_IO_PENDING) {
-      // std::cout << "resp io pending" << std::endl;
       optr.release();
     } else if (result == NO_ERROR) {
       // TODO: caller needs to call this recieve body again.
@@ -179,6 +178,7 @@ public:
       PHTTP_RESPONSE resp, HTTP_REQUEST_ID requestId, ULONG flags,
       BOOST_ASIO_MOVE_ARG(WriteHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
+    BOOST_LOG_TRIVIAL(debug) << "async_send_response";
     boost::asio::windows::overlapped_ptr optr(this->get_executor(), handler);
     DWORD result = HttpSendHttpResponse(
         this->native_handle(), // ReqQueueHandle
@@ -194,16 +194,13 @@ public:
     );
     boost::system::error_code ec;
     if (result == ERROR_IO_PENDING) {
-      std::cout << "resp io pending" << std::endl;
       optr.release();
     } else if (result == NO_ERROR) {
-      std::cout << "resp io ok synchronous" << std::endl;
       // Note: this is different from namedpipe connect
       // if there is no error, we still get notification from iocp
       // do not complete here, else iocp is corrupted.
       optr.release();
     } else {
-      std::cout << "resp io error" << std::endl;
       // error
       ec = boost::system::error_code(result,
                                      boost::asio::error::get_system_category());
@@ -213,6 +210,7 @@ public:
 
   void send_response(PHTTP_RESPONSE resp, HTTP_REQUEST_ID requestId,
                      ULONG flags, boost::system::error_code &ec) {
+    BOOST_LOG_TRIVIAL(debug) << "send_response";
     ULONG bytesSent;
     DWORD result = HttpSendHttpResponse(
         this->native_handle(), // ReqQueueHandle

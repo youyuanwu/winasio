@@ -33,19 +33,17 @@ public:
   typedef Executor executor_type;
 
   http_connection(winnet::http::basic_http_handle<executor_type> &queue_handle)
-      : http_connection(
-            queue_handle,
-            [](const winnet::http::simple_request<std::vector<CHAR>> &request,
-               winnet::http::simple_response<std::string> &response) {
-              // default handler
-              response.set_status_code(503);
-              response.set_reason("Not Implemented");
-            }) {}
+      : http_connection(queue_handle,
+                        [](const winnet::http::simple_request &request,
+                           winnet::http::simple_response &response) {
+                          // default handler
+                          response.set_status_code(503);
+                          response.set_reason("Not Implemented");
+                        }) {}
 
   http_connection(winnet::http::basic_http_handle<executor_type> &queue_handle,
-                  std::function<void(
-                      const winnet::http::simple_request<std::vector<CHAR>> &,
-                      winnet::http::simple_response<std::string> &)>
+                  std::function<void(const winnet::http::simple_request &,
+                                     winnet::http::simple_response &)>
                       handler)
       : queue_handle_(queue_handle), request_(), response_(),
         handler_(handler) {}
@@ -57,18 +55,18 @@ public:
 
 private:
   // request block
-  winnet::http::simple_request<std::vector<CHAR>> request_;
+  winnet::http::simple_request request_;
   // response block
-  winnet::http::simple_response<std::string> response_;
+  winnet::http::simple_response response_;
 
   winnet::http::basic_http_handle<executor_type> &queue_handle_;
 
-  std::function<void(const winnet::http::simple_request<std::vector<CHAR>> &,
-                     winnet::http::simple_response<std::string> &)>
+  std::function<void(const winnet::http::simple_request &,
+                     winnet::http::simple_response &)>
       handler_;
 
   void receive_request() {
-    std::cout << "connection receive_request" << std::endl;
+    BOOST_LOG_TRIVIAL(debug) << "http_connection receive_request";
     auto self = this->shared_from_this();
     // this is the vector<char>
     auto &dynamicbuff = request_.get_request_dynamic_buffer();
@@ -77,8 +75,8 @@ private:
         queue_handle_, dynamicbuff,
         [self](boost::system::error_code ec, std::size_t) {
           if (ec) {
-            std::cout << "async_recieve_request failed: " << ec.message()
-                      << std::endl;
+            BOOST_LOG_TRIVIAL(debug)
+                << "async_recieve_request failed: " << ec.message();
           } else {
             self->on_receive_request();
             // start another connection
@@ -96,8 +94,8 @@ private:
         queue_handle_, request_.get_request_id(), buff,
         [self](boost::system::error_code ec, std::size_t len) {
           if (ec) {
-            std::cout << "async_recieve_body failed: " << ec.message()
-                      << std::endl;
+            BOOST_LOG_TRIVIAL(debug)
+                << "async_recieve_body failed: " << ec.message();
           } else {
             self->on_recieve_body();
           }
@@ -113,8 +111,10 @@ private:
         response_.get_response(), request_.get_request_id(),
         HTTP_SEND_RESPONSE_FLAG_DISCONNECT, // single resp flag
         [self](boost::system::error_code ec, std::size_t) {
-          std::cout << "async_send_response handler: " << ec.message()
-                    << std::endl;
+          if (ec) {
+            BOOST_LOG_TRIVIAL(debug)
+                << "async_send_response failed: " << ec.message();
+          }
         });
   }
 };
