@@ -3,7 +3,7 @@
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/windows/basic_overlapped_handle.hpp>
 
-#include <boost/winasio/http/convert.hpp>
+#include <boost/log/trivial.hpp>
 
 #include <iostream>
 
@@ -82,67 +82,77 @@ public:
                                    boost::asio::error::get_system_category());
   }
 
-  template <typename MutableBufferSequence,
-            BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
+  template <BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
                                                  std::size_t)) ReadHandler
                 BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
   BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(ReadHandler,
                                      void(boost::system::error_code,
                                           std::size_t))
   async_recieve_request(
-      const MutableBufferSequence &buffers,
+      _In_ HTTP_REQUEST_ID RequestId, _In_ ULONG Flags,
+      _Out_ PHTTP_REQUEST RequestBuffer, _In_ ULONG RequestBufferLength,
       BOOST_ASIO_MOVE_ARG(ReadHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
-    boost::asio::windows::overlapped_ptr optr(this->get_executor(), handler);
-    PHTTP_REQUEST pRequest = phttp_request(buffers);
-    ULONG result = HttpReceiveHttpRequest(
-        this->native_handle(),              // Req Queue
-        pRequest->RequestId,                // Req ID
-        0,                                  // Flags. TODO: expose this
-        pRequest,                           // HTTP request buffer
-        static_cast<ULONG>(buffers.size()), // req buffer length
-        NULL,      // bytes received. must be null in async
-        optr.get() // LPOVERLAPPED
-    );
-    boost::system::error_code ec;
-    // TODO: handle more data???
-    if (result == ERROR_HANDLE_EOF) {
-      optr.complete(ec, 0);
-    } else if (result == NO_ERROR) {
-      std::cout << "recieve io ok synchronous" << std::endl;
+    BOOST_LOG_TRIVIAL(debug)
+        << L"async_recieve_request buff len " << RequestBufferLength;
+
+    boost::asio::windows::overlapped_ptr optr(this->get_executor(),
+                                              std::move(handler));
+    ULONG result =
+        HttpReceiveHttpRequest(this->native_handle(), // Req Queue
+                               RequestId,             // Req ID
+                               Flags,                 // Flags.
+                               RequestBuffer,         // HTTP request buffer
+                               RequestBufferLength,   // req buffer length
+                               NULL, // bytes received. must be null in async
+                               optr.get() // LPOVERLAPPED
+        );
+
+    if (result == NO_ERROR) {
+      BOOST_LOG_TRIVIAL(debug) << L"async_recieve_request is synchronous";
       // TODO: investigate if this should be a release() or complete().
       // This needs future testing. If iocp is corrupted, this might be the
       // reason.
       // optr.complete(ec, 0);
       optr.release();
+      return;
     } else if (result == ERROR_IO_PENDING) {
       optr.release();
+      return;
     } else {
-      // error
+      // error cases
+      // note that ERROR_HANDLE_EOF should be handled by caller
+      boost::system::error_code ec;
       ec = boost::system::error_code(result,
                                      boost::asio::error::get_system_category());
+      // insufficient buff means that the buffer is smaller than
+      // sizeof(HTTP_REQUEST). this lib does not handle this case, and user must
+      // pass in buff at least of this size.
+      BOOST_ASSERT(result != ERROR_INSUFFICIENT_BUFFER);
       optr.complete(ec, 0);
     }
   }
 
-  template <typename MutableBufferSequence,
-            BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
+  template <BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
                                                  std::size_t)) ReadHandler
                 BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
   BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(ReadHandler,
                                      void(boost::system::error_code,
                                           std::size_t))
   async_recieve_body(
-      const MutableBufferSequence &buffers, HTTP_REQUEST_ID requestId,
-      ULONG flags,
+      _In_ HTTP_REQUEST_ID RequestId, _In_ ULONG Flags,
+      _Out_ PVOID EntityBuffer, _In_ ULONG EntityBufferLength,
       BOOST_ASIO_MOVE_ARG(ReadHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
-    boost::asio::windows::overlapped_ptr optr(this->get_executor(), handler);
-    DWORD result = HttpReceiveRequestEntityBody(
-        this->native_handle(), requestId, flags, (PVOID)buffers.data(),
-        static_cast<ULONG>(buffers.size()),
-        NULL, //    BytesReturned,
-        optr.get());
+    BOOST_LOG_TRIVIAL(debug)
+        << L"async_recieve_body buff len " << EntityBufferLength;
+    boost::asio::windows::overlapped_ptr optr(this->get_executor(),
+                                              std::move(handler));
+    DWORD result =
+        HttpReceiveRequestEntityBody(this->native_handle(), RequestId, Flags,
+                                     EntityBuffer, EntityBufferLength,
+                                     NULL, //    BytesReturned,
+                                     optr.get());
     boost::system::error_code ec;
     if (result == ERROR_IO_PENDING) {
       // std::cout << "resp io pending" << std::endl;
@@ -151,12 +161,8 @@ public:
       // TODO: caller needs to call this recieve body again.
       // until eof is reached.
       optr.release();
-    } else if (result == ERROR_HANDLE_EOF) {
-      // no more data. success.
-      optr.complete(ec, 0);
     } else {
-      // std::cout << "resp io error" << std::endl;
-      // error
+      // ERROR_HANDLE_EOF needs to be handled by caller
       ec = boost::system::error_code(result,
                                      boost::asio::error::get_system_category());
       optr.complete(ec, 0);

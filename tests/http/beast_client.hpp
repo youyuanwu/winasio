@@ -22,7 +22,7 @@ public:
 
   inline void set_body(std::string body) { body_ = body; }
 
-private:
+  // private:
   std::map<std::string, std::string> headers_;
   std::string body_;
 };
@@ -55,6 +55,11 @@ inline boost::system::error_code make_test_request(test_request const &request,
   http::request<http::string_body> req{http::verb::get, "/winhttpapitest", 11};
   req.set(http::field::host, "localhost");
   req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+  // Set custom header
+  for (auto &kv : request.headers_) {
+    req.set(kv.first, kv.second);
+  }
 
   // Send the HTTP request to the remote host
   http::write(stream, req);

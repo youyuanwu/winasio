@@ -14,15 +14,14 @@
 
 #include <http.h>
 
-#include "boost/winasio/http/http.hpp"
+#include "boost/winasio/http/convert.hpp"
+#include "boost/winasio/http/http_asio.hpp"
 
 #include <functional>
 #include <iostream>
 #include <stdio.h>
 #include <string>
 #include <vector>
-
-#pragma comment(lib, "httpapi.lib")
 
 namespace net = boost::asio;
 namespace winnet = boost::winasio;
@@ -56,12 +55,6 @@ public:
     // check_deadline();
   }
 
-  // void set_handler(std::function<void(const
-  // winasio::http::simple_request<std::vector<CHAR>>&,
-  //     winasio::http::simple_response<std::string>&)> handler){
-  //         this->handler_ = handler;
-  // }
-
 private:
   // request block
   winnet::http::simple_request<std::vector<CHAR>> request_;
@@ -77,8 +70,11 @@ private:
   void receive_request() {
     std::cout << "connection receive_request" << std::endl;
     auto self = this->shared_from_this();
-    queue_handle_.async_recieve_request(
-        net::buffer(request_.get_request_buffer()),
+    // this is the vector<char>
+    auto &dynamicbuff = request_.get_request_dynamic_buffer();
+
+    winnet::http::async_receive(
+        queue_handle_, dynamicbuff,
         [self](boost::system::error_code ec, std::size_t) {
           if (ec) {
             std::cout << "async_recieve_request failed: " << ec.message()
@@ -95,21 +91,20 @@ private:
 
   void on_receive_request() {
     auto self = this->shared_from_this();
-    queue_handle_.async_recieve_body(
-        net::buffer(request_.get_body_buffer()), request_.get_request_id(),
-        0, // flag
+    auto &buff = request_.get_body_dynamic_buffer();
+    winnet::http::async_receive_body(
+        queue_handle_, request_.get_request_id(), buff,
         [self](boost::system::error_code ec, std::size_t len) {
           if (ec) {
             std::cout << "async_recieve_body failed: " << ec.message()
                       << std::endl;
           } else {
-            self->on_recieve_body(len);
+            self->on_recieve_body();
           }
         });
   }
 
-  void on_recieve_body(std::size_t len) {
-    request_.set_body_len(len);
+  void on_recieve_body() {
     // all request data is ready, invoke use handler
     this->handler_(this->request_, this->response_);
 

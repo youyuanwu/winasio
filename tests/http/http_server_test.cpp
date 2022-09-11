@@ -36,8 +36,13 @@ TEST(HTTPServer, DISABLED_ReceiveRequest) // TODO:
   std::vector<BYTE> buffer(
       sizeof(HTTP_REQUEST) + 10,
       0); // make a buffer that is smaller than the request header data
+  auto buff = net::buffer(buffer);
+  PHTTP_REQUEST pRequest = winnet::http::phttp_request(buff);
   queue.async_recieve_request(
-      net::buffer(buffer), [](boost::system::error_code ec, std::size_t len) {
+      pRequest->RequestId,
+      0, // flags
+      pRequest, static_cast<ULONG>(buff.size()),
+      [](boost::system::error_code ec, std::size_t len) {
         if (ec) {
           std::cout << "async_recieve_request failed: " << ec.message()
                     << " len " << len << " min " << sizeof(HTTP_REQUEST)
@@ -94,7 +99,7 @@ TEST(HTTPServer, server) {
         // handler for testing
         PHTTP_REQUEST req = request.get_request();
         std::wcout << L"Got a request for url: " << req->CookedUrl.pFullUrl
-                   << L"VerbId: " << static_cast<int>(req->Verb) << std::endl;
+                   << L" VerbId: " << static_cast<int>(req->Verb) << std::endl;
         std::cout << request << std::endl;
         response.set_status_code(200);
         response.set_reason("OK");

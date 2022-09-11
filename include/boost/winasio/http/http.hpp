@@ -7,6 +7,8 @@
 
 #include "boost/assert.hpp"
 
+#pragma comment(lib, "httpapi.lib")
+
 namespace boost {
 namespace winasio {
 namespace http {
