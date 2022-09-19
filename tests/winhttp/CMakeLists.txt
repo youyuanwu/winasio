@@ -9,7 +9,7 @@ foreach(test_file ${SOURCES})
     target_include_directories(${test_name} 
       PRIVATE .
     )
-    target_link_libraries(${test_name} PRIVATE gtest_main winasio ${Boost_LIBRARIES})
+    target_link_libraries(${test_name} PRIVATE gtest_main winasio)
     set_property(TARGET ${test_name} PROPERTY CXX_STANDARD 20) # for semaphore
     add_test(NAME ${test_name} COMMAND ${test_name} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endforeach()
