@@ -9,6 +9,10 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 
+#include <boost/log/core.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/trivial.hpp>
+
 #include <cstdio>
 #include <utility>
 
@@ -17,7 +21,15 @@ namespace http = beast::http;   // from <boost/beast/http.hpp>
 namespace net = boost::asio;    // from <boost/asio.hpp>
 using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
+namespace logging = boost::log;
+
+void log_init() {
+  logging::core::get()->set_filter(logging::trivial::severity >=
+                                   logging::trivial::debug);
+}
+
 TEST(HTTPServer, server) {
+  log_init();
   // init http module
   winnet::http::http_initializer init;
   // add https then this becomes https server
@@ -39,7 +51,7 @@ TEST(HTTPServer, server) {
     BOOST_LOG_TRIVIAL(debug)
         << L"Got a request for url: " << req->CookedUrl.pFullUrl << L" VerbId: "
         << static_cast<int>(req->Verb);
-    std::cout << request << std::endl;
+    BOOST_LOG_TRIVIAL(debug) << request;
     response.set_status_code(200);
     response.set_reason("OK");
     response.set_content_type("text/html");
