@@ -1,0 +1,1 @@
+winhttp callback handle error case
