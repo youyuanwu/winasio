@@ -233,7 +233,6 @@ public:
     ec = boost::system::error_code(result,
                                    boost::asio::error::get_system_category());
   }
-
 };
 } // namespace http
 } // namespace winasio
