@@ -67,7 +67,6 @@ public:
     BOOST_ASSERT(retCode == NO_ERROR);
   }
 };
-
 } // namespace http
 } // namespace winasio
 } // namespace boost

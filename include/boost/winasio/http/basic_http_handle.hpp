@@ -227,6 +227,12 @@ public:
     ec = boost::system::error_code(result,
                                    boost::asio::error::get_system_category());
   }
+
+  void shutdown(boost::system::error_code &ec) {
+    DWORD result = HttpShutdownRequestQueue(this->native_handle());
+    ec = boost::system::error_code(result,
+                                   boost::asio::error::get_system_category());
+  }
 };
 } // namespace http
 } // namespace winasio

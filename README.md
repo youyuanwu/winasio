@@ -16,7 +16,7 @@ Counter part in other languages:
 
 See [examples](https://github.com/youyuanwu/winasio/tree/main/examples/named_pipe) for usage.
 
-## Winodws Http Api (http.sys)
+## Windows Http Api (http.sys)
 [Windows Http Api](https://docs.microsoft.com/en-us/windows/win32/http/http-server-api-overview)
 
 Utilize asio overlapped io intergration with executors.
@@ -34,5 +34,5 @@ See [Internals.md](docs/Internals.md) for implmentation details.
 [asio/boost-asio](https://github.com/boostorg/asio)
 Install as part of boost: [boost windows install](https://www.boost.org/doc/libs/1_80_0/more/getting_started/windows.html)
 
-# Lisencing
+# Licensing
 Boost Software License - Version 1.0
