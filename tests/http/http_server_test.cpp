@@ -123,7 +123,7 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   std::thread t([&]() {
     std::this_thread::sleep_for(300ms);
     boost::system::error_code ec;
-    queue.stop(ec);
+    queue.shutdown(ec);
   });
 
   io_context.run();
@@ -131,5 +131,5 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   t.join();
 
   ASSERT_TRUE(cncl_ec.value() == 995); // cancelled.
-
 }
+
