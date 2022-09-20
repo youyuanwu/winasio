@@ -79,19 +79,12 @@ private:
                 << "async_recieve_request failed: " << ec.message();
           } else {
             self->on_receive_request();
-            // receive again
-            self->reset_request();
-            self->receive_request();
+            // start another connection
+            std::make_shared<http_connection>(self->queue_handle_,
+                                              self->handler_)
+                ->start();
           }
         });
-  }
-
-  void reset_request() {
-    // clear the rq & body buffer for the next one.
-    auto &rq_buf = request_.get_request_dynamic_buffer();
-    rq_buf.consume(rq_buf.size());
-    auto &body_buf = request_.get_body_dynamic_buffer();
-    body_buf.consume(body_buf.size());
   }
 
   void on_receive_request() {
