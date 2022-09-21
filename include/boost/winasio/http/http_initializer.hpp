@@ -24,8 +24,8 @@ public:
   }
 };
 
-}
-}
-}
+} // namespace http
+} // namespace winasio
+} // namespace boost
 
 #endif // BOOST_WINASIO_HTTP_INITIALIZER_HPP

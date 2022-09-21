@@ -29,7 +29,6 @@ using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 namespace logging = boost::log;
 namespace winnet = boost::winasio;
 
-
 void log_init() {
   logging::core::get()->set_filter(logging::trivial::severity >=
                                    logging::trivial::debug);
@@ -147,8 +146,7 @@ TEST(HTTPServer, server_url_register_api) {
   // open queue handle
   winnet::http::queue queue(ctx, winnet::http::open_raw_http_queue());
 
-  winnet::http::controller
-      controller(queue, L"http://localhost:1337/");
+  winnet::http::controller controller(queue, L"http://localhost:1337/");
 
   controller.get(L"/url-123", [](const winnet::http::simple_request &rq,
                                  winnet::http::simple_response &rsp) {
@@ -163,13 +161,13 @@ TEST(HTTPServer, server_url_register_api) {
   });
 
   controller.put(L"/url-123", [](const winnet::http::simple_request &rq,
-                                  winnet::http::simple_response &rsp) {
+                                 winnet::http::simple_response &rsp) {
     rsp.set_body("Hello world");
     rsp.set_status_code(204);
   });
 
   controller.del(L"/url-123", [](const winnet::http::simple_request &rq,
-                                  winnet::http::simple_response &rsp) {
+                                 winnet::http::simple_response &rsp) {
     rsp.set_body("Hello world");
     rsp.set_status_code(200);
   });
