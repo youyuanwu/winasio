@@ -1,3 +1,4 @@
+#include "boost/winasio/http/basic_http_controller.hpp"
 #include "boost/winasio/http/temp.hpp"
 #include "gtest/gtest.h"
 
@@ -131,4 +132,45 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   t.join();
 
   ASSERT_TRUE(cncl_ec.value() == 995); // cancelled.
+}
+
+TEST(HTTPServer, server_url_register_api) {
+  // init http module
+  winnet::http::http_initializer init;
+
+  boost::system::error_code ec;
+  net::io_context ctx;
+
+  // open queue handle
+  winnet::http::server server(ctx, winnet::http::open_raw_http_queue());
+
+  winnet::http::basic_http_controller<net::io_context::executor_type>
+      controller(server, L"http://localhost:1337/");
+
+  controller.get(L"/url-123", [](const winnet::http::simple_request &rq,
+                                 winnet::http::simple_response &rsp) {
+    rsp.set_body("Hello world");
+    rsp.set_status_code(200);
+  });
+
+  controller.post(L"/url-123", [](const winnet::http::simple_request &rq,
+                                  winnet::http::simple_response &rsp) {
+    rsp.set_body("Hello world");
+    rsp.set_status_code(201);
+  });
+
+  controller.put(L"/url-123", [](const winnet::http::simple_request &rq,
+                                  winnet::http::simple_response &rsp) {
+    rsp.set_body("Hello world");
+    rsp.set_status_code(201);
+  });
+
+  controller.del(L"/url-123", [](const winnet::http::simple_request &rq,
+                                  winnet::http::simple_response &rsp) {
+    rsp.set_body("Hello world");
+    rsp.set_status_code(201);
+  });
+
+  controller.start();
+  ctx.run();
 }

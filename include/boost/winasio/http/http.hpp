@@ -33,7 +33,7 @@ template <typename Executor> class http_simple_url {
 public:
   typedef Executor executor_type;
   http_simple_url(basic_http_handle<executor_type> &queue_handle,
-                  std::wstring url)
+                  const std::wstring &url)
       : queue_handle_(queue_handle), url_(url) {
     boost::system::error_code ec;
     queue_handle_.add_url(url_, ec);
@@ -45,6 +45,12 @@ public:
     queue_handle_.remove_url(url_, ec);
     BOOST_ASSERT(!ec.failed());
   }
+
+  http_simple_url(const http_simple_url &) = delete;
+  http_simple_url &operator=(const http_simple_url &) = delete;
+
+  http_simple_url(http_simple_url &&) = delete;
+  http_simple_url &operator=(http_simple_url &&) = delete;
 
 private:
   basic_http_handle<executor_type> &queue_handle_;
@@ -67,6 +73,11 @@ public:
     BOOST_ASSERT(retCode == NO_ERROR);
   }
 };
+
+using server = basic_http_handle<net::io_context::executor_type>;
+namespace v1 {
+using url = http_simple_url<net::io_context::executor_type>;
+} // namespace v1
 } // namespace http
 } // namespace winasio
 } // namespace boost
