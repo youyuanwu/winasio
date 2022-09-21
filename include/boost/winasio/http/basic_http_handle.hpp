@@ -1,7 +1,10 @@
 #pragma once
 
+#include <http.h>
+
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/windows/basic_overlapped_handle.hpp>
+#include <boost/asio/windows/overlapped_ptr.hpp>
 
 #include <boost/log/trivial.hpp>
 

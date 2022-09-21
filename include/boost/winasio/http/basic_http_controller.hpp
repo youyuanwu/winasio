@@ -1,8 +1,8 @@
 #pragma once
 
-#include "boost/winasio/http/http_asio.hpp"
 #include "boost/winasio/http/basic_http_handle.hpp"
 #include "boost/winasio/http/convert.hpp"
+#include "boost/winasio/http/http_asio.hpp"
 //#include "boost/winasio/http/basic_http_request.hpp"
 //#include "boost/winasio/http/basic_http_response.hpp"
 
@@ -37,33 +37,31 @@ public:
   template <typename Handler>
   void get(const std::wstring &url_part, Handler &&h) {
     register_url_part<HTTP_VERB::HttpVerbGET>(url_part,
-                     std::forward<Handler>(h));
+                                              std::forward<Handler>(h));
   }
 
   template <typename Handler>
   void post(const std::wstring &url_part, Handler &&h) {
-   
+
     register_url_part<HTTP_VERB::HttpVerbPOST>(url_part,
-                     std::forward<Handler>(h));
+                                               std::forward<Handler>(h));
   }
 
   template <typename Handler>
   void put(const std::wstring &url_part, Handler &&h) {
 
-     register_url_part<HTTP_VERB::HttpVerbPUT>(url_part,
-                                               std::forward<Handler>(h));
+    register_url_part<HTTP_VERB::HttpVerbPUT>(url_part,
+                                              std::forward<Handler>(h));
   }
 
   template <typename Handler>
   void del(const std::wstring &url_part, Handler &&h) {
 
-     register_url_part<HTTP_VERB::HttpVerbDELETE>(url_part,
-                                               std::forward<Handler>(h));
+    register_url_part<HTTP_VERB::HttpVerbDELETE>(url_part,
+                                                 std::forward<Handler>(h));
   }
 
-  void start() {
-    receive_next_request();
-  }
+  void start() { receive_next_request(); }
 
 private:
   std::wstring format_url_base(std::wstring base_url) {
@@ -91,7 +89,7 @@ private:
 
   template <HTTP_VERB verb, typename Handler>
   void register_handler(const std::wstring &url, Handler &&h) {
-    handlers_[url][verb] = std::forward<Handler>(h);    
+    handlers_[url][verb] = std::forward<Handler>(h);
   }
 
   void receive_next_request() {
@@ -118,18 +116,19 @@ private:
     const auto *url_b = prq->CookedUrl.pFullUrl;
     const auto *url_e =
         prq->CookedUrl.pQueryString == nullptr
-            ? prq->CookedUrl.pFullUrl + (prq->CookedUrl.FullUrlLength/sizeof(std::wstring::value_type))
+            ? prq->CookedUrl.pFullUrl + (prq->CookedUrl.FullUrlLength /
+                                         sizeof(std::wstring::value_type))
             : prq->CookedUrl.pQueryString;
 
     std::wstring url(url_b, url_e);
 
-    if (handlers_.find(url) == handlers_.end() || handlers_[url].at(prq->Verb) == nullptr) {
+    if (handlers_.find(url) == handlers_.end() ||
+        handlers_[url].at(prq->Verb) == nullptr) {
       rq.second.set_status_code(404);
       rq.second.set_reason("Not found");
     } else {
       rq.second.set_status_code(200); // default to 200
-        handlers_[url].at(prq->Verb)(rq.first, rq.second);
-    
+      handlers_[url].at(prq->Verb)(rq.first, rq.second);
     }
     queue_.async_send_response(
         rq.second.get_response(), rq.first.get_request_id(),

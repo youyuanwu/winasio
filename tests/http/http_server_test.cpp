@@ -162,13 +162,13 @@ TEST(HTTPServer, server_url_register_api) {
   controller.put(L"/url-123", [](const winnet::http::simple_request &rq,
                                   winnet::http::simple_response &rsp) {
     rsp.set_body("Hello world");
-    rsp.set_status_code(201);
+    rsp.set_status_code(204);
   });
 
   controller.del(L"/url-123", [](const winnet::http::simple_request &rq,
                                   winnet::http::simple_response &rsp) {
     rsp.set_body("Hello world");
-    rsp.set_status_code(201);
+    rsp.set_status_code(200);
   });
 
   controller.start();
