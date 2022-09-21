@@ -173,5 +173,5 @@ TEST(HTTPServer, server_url_register_api) {
   });
 
   controller.start();
-  ctx.run();
+  //ctx.run();
 }
