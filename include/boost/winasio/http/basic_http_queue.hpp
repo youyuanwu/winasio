@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BOOST_WINASIO_BASIC_HTTP_QUEUE_HPP
+#define BOOST_WINASIO_BASIC_HTTP_QUEUE_HPP
 
 #include <http.h>
 
@@ -17,7 +18,7 @@ namespace net = boost::asio;
 namespace winnet = net::windows;
 
 template <typename Executor = net::any_io_executor>
-class basic_http_handle : public winnet::basic_overlapped_handle<Executor> {
+class basic_http_queue : public winnet::basic_overlapped_handle<Executor> {
 public:
   /// The type of the executor associated with the object.
   typedef Executor executor_type;
@@ -25,7 +26,7 @@ public:
   /// Rebinds the handle type to another executor.
   template <typename Executor1> struct rebind_executor {
     /// The handle type when rebound to the specified executor.
-    typedef basic_http_handle<Executor1> other;
+    typedef basic_http_queue<Executor1> other;
   };
 
   /// The native representation of a handle.
@@ -36,11 +37,11 @@ public:
       native_handle_type;
 #endif
 
-  explicit basic_http_handle(const executor_type &ex)
+  explicit basic_http_queue(const executor_type &ex)
       : winnet::basic_overlapped_handle<Executor>(ex) {}
 
   template <typename ExecutionContext>
-  explicit basic_http_handle(
+  explicit basic_http_queue(
       ExecutionContext &context,
       typename net::constraint<
           net::is_convertible<ExecutionContext &,
@@ -48,20 +49,20 @@ public:
           net::defaulted_constraint>::type = net::defaulted_constraint())
       : winnet::basic_overlapped_handle<Executor>(context) {}
 
-  basic_http_handle(const executor_type &ex, const native_handle_type &handle)
+  basic_http_queue(const executor_type &ex, const native_handle_type &handle)
       : winnet::basic_overlapped_handle<Executor>(ex, handle) {}
 
   template <typename ExecutionContext>
-  basic_http_handle(
+  basic_http_queue(
       ExecutionContext &context, const native_handle_type &handle,
       typename net::constraint<net::is_convertible<
           ExecutionContext &, net::execution_context &>::value>::type = 0)
       : winnet::basic_overlapped_handle<Executor>(context, handle) {}
 
-  basic_http_handle(basic_http_handle &&other)
+  basic_http_queue(basic_http_queue &&other)
       : winnet::basic_overlapped_handle<Executor>(std::move(other)) {}
 
-  basic_http_handle &operator=(basic_http_handle &&other) {
+  basic_http_queue &operator=(basic_http_queue &&other) {
     winnet::basic_overlapped_handle<Executor>::operator=(std::move(other));
     return *this;
   }
@@ -240,3 +241,5 @@ public:
 } // namespace http
 } // namespace winasio
 } // namespace boost
+
+#endif // BOOST_WINASIO_BASIC_HTTP_QUEUE_HPP

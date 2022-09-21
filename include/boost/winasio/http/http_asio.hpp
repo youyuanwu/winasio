@@ -1,7 +1,8 @@
-#pragma once
+#ifndef BOOST_WINASIO_HTTP_ASIO_HPP
+#define BOOST_WINASIO_HTTP_ASIO_HPP
 
 // compose operations for http
-#include "boost/winasio/http/http.hpp"
+#include <boost/winasio/http/basic_http_queue.hpp>
 
 namespace boost {
 namespace winasio {
@@ -26,7 +27,7 @@ template <typename Executor, typename DynamicBuffer>
 class async_receive_op : boost::asio::coroutine {
 public:
   typedef Executor executor_type;
-  async_receive_op(basic_http_handle<executor_type> &h, DynamicBuffer &buff)
+  async_receive_op(basic_http_queue<executor_type> &h, DynamicBuffer &buff)
       : h_(h), buff_(buff), state_(state::idle) {}
 
   template <typename Self>
@@ -72,7 +73,7 @@ public:
   }
 
 private:
-  basic_http_handle<executor_type> &h_;
+  basic_http_queue<executor_type> &h_;
   DynamicBuffer &buff_;
   enum class state { idle, recieving } state_;
 
@@ -96,7 +97,7 @@ template <typename Executor, typename DynamicBuffer>
 class async_receive_body_op : boost::asio::coroutine {
 public:
   typedef Executor executor_type;
-  async_receive_body_op(basic_http_handle<executor_type> &h, HTTP_REQUEST_ID id,
+  async_receive_body_op(basic_http_queue<executor_type> &h, HTTP_REQUEST_ID id,
                         DynamicBuffer &buff)
       : h_(h), id_(id), buff_(buff), state_(state::idle) {}
 
@@ -134,7 +135,7 @@ public:
   }
 
 private:
-  basic_http_handle<executor_type> &h_;
+  basic_http_queue<executor_type> &h_;
   HTTP_REQUEST_ID id_;
   DynamicBuffer &buff_;
   enum class state { idle, recieving } state_;
@@ -156,7 +157,7 @@ template <typename Executor, typename DynamicBuffer,
           BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
                                                std::size_t))
               Token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(Executor)>
-auto async_receive(basic_http_handle<Executor> &h, DynamicBuffer &buffer,
+auto async_receive(basic_http_queue<Executor> &h, DynamicBuffer &buffer,
                    Token &&token) {
 
   return boost::asio::async_compose<Token, void(boost::system::error_code,
@@ -169,7 +170,7 @@ template <typename Executor, typename DynamicBuffer,
           BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
                                                std::size_t))
               Token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(Executor)>
-auto async_receive_body(basic_http_handle<Executor> &h, HTTP_REQUEST_ID id,
+auto async_receive_body(basic_http_queue<Executor> &h, HTTP_REQUEST_ID id,
                         DynamicBuffer &buffer, Token &&token) {
 
   return boost::asio::async_compose<Token, void(boost::system::error_code,
@@ -181,3 +182,5 @@ auto async_receive_body(basic_http_handle<Executor> &h, HTTP_REQUEST_ID id,
 } // namespace http
 } // namespace winasio
 } // namespace boost
+
+#endif // BOOST_WINASIO_HTTP_ASIO

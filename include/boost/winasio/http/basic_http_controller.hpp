@@ -1,16 +1,15 @@
-#pragma once
+#ifndef BOOST_WINASIO_BASIC_HTTP_CONTROLLER_HPP
+#define BOOST_WINASIO_BASIC_HTTP_CONTROLLER_HPP
 
-#include "boost/winasio/http/basic_http_handle.hpp"
-#include "boost/winasio/http/convert.hpp"
-#include "boost/winasio/http/http_asio.hpp"
+#include <boost/winasio/http/basic_http_queue.hpp>
+#include <boost/winasio/http/convert.hpp>
+#include <boost/winasio/http/http_asio.hpp>
+
 //#include "boost/winasio/http/basic_http_request.hpp"
 //#include "boost/winasio/http/basic_http_response.hpp"
 
 #include <functional>
 #include <map>
-
-#pragma push_macro("DELETE")
-#undef DELETE
 
 namespace boost {
 namespace winasio {
@@ -27,7 +26,7 @@ class basic_http_controller {
       std::pair<http::simple_request, http::simple_response>;
 
 public:
-  basic_http_controller(basic_http_handle<Executor> &queue,
+  basic_http_controller(basic_http_queue<Executor> &queue,
                         const std::wstring &url_base)
       : queue_(queue), base_url_(format_url_base(url_base)) {
     boost::system::error_code ec;
@@ -141,11 +140,11 @@ private:
            std::array<request_handler, HTTP_VERB::HttpVerbMaximum>>
       handlers_;
   const std::wstring base_url_;
-  basic_http_handle<Executor> &queue_;
+  basic_http_queue<Executor> &queue_;
 };
-
-#pragma pop_macro("DELETE")
 
 } // namespace http
 } // namespace winasio
 } // namespace boost
+
+#endif // BOOST_WINASIO_BASIC_HTTP_CONTROLLER_HPP

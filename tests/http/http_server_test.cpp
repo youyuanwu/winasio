@@ -1,5 +1,6 @@
-#include "boost/winasio/http/basic_http_controller.hpp"
-#include "boost/winasio/http/temp.hpp"
+#include <boost/winasio/http/http.hpp>
+#include <boost/winasio/http/temp.hpp>
+
 #include "gtest/gtest.h"
 
 #include "beast_client.hpp"
@@ -26,6 +27,8 @@ namespace net = boost::asio;    // from <boost/asio.hpp>
 using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 namespace logging = boost::log;
+namespace winnet = boost::winasio;
+
 
 void log_init() {
   logging::core::get()->set_filter(logging::trivial::severity >=
@@ -43,10 +46,10 @@ TEST(HTTPServer, server) {
   net::io_context io_context;
 
   // open queue handle
-  winnet::http::basic_http_handle<net::io_context::executor_type> queue(
+  winnet::http::basic_http_queue<net::io_context::executor_type> queue(
       io_context);
   queue.assign(winnet::http::open_raw_http_queue());
-  winnet::http::http_simple_url simple_url(queue, url);
+  winnet::http::basic_http_url simple_url(queue, url);
 
   auto handler = [](const winnet::http::simple_request &request,
                     winnet::http::simple_response &response) {
@@ -110,10 +113,10 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   net::io_context io_context;
 
   // open queue handle
-  winnet::http::basic_http_handle<net::io_context::executor_type> queue(
+  winnet::http::basic_http_queue<net::io_context::executor_type> queue(
       io_context);
   queue.assign(winnet::http::open_raw_http_queue());
-  winnet::http::http_simple_url simple_url(queue, url);
+  winnet::http::basic_http_url simple_url(queue, url);
 
   winnet::http::simple_request rq;
   boost::system::error_code cncl_ec;
@@ -142,10 +145,10 @@ TEST(HTTPServer, server_url_register_api) {
   net::io_context ctx;
 
   // open queue handle
-  winnet::http::server server(ctx, winnet::http::open_raw_http_queue());
+  winnet::http::queue queue(ctx, winnet::http::open_raw_http_queue());
 
-  winnet::http::basic_http_controller<net::io_context::executor_type>
-      controller(server, L"http://localhost:1337/");
+  winnet::http::controller
+      controller(queue, L"http://localhost:1337/");
 
   controller.get(L"/url-123", [](const winnet::http::simple_request &rq,
                                  winnet::http::simple_response &rsp) {
