@@ -22,7 +22,8 @@ namespace net = boost::asio;
 namespace winnet = net::windows;
 
 template <typename Executor = net::any_io_executor>
-class basic_http_queue_handle : public winnet::basic_overlapped_handle<Executor> {
+class basic_http_queue_handle
+    : public winnet::basic_overlapped_handle<Executor> {
 public:
   /// The type of the executor associated with the object.
   typedef Executor executor_type;
@@ -53,7 +54,8 @@ public:
           net::defaulted_constraint>::type = net::defaulted_constraint())
       : winnet::basic_overlapped_handle<Executor>(context) {}
 
-  basic_http_queue_handle(const executor_type &ex, const native_handle_type &handle)
+  basic_http_queue_handle(const executor_type &ex,
+                          const native_handle_type &handle)
       : winnet::basic_overlapped_handle<Executor>(ex, handle) {}
 
   template <typename ExecutionContext>

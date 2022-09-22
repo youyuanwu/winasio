@@ -6,9 +6,9 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include <boost/asio.hpp>
-#include <boost/winasio/http/basic_http_request_context.hpp>
 #include <boost/winasio/http/basic_http_controller.hpp>
 #include <boost/winasio/http/basic_http_queue_handle.hpp>
+#include <boost/winasio/http/basic_http_request_context.hpp>
 #include <boost/winasio/http/basic_http_url.hpp>
 
 #include <boost/winasio/http/convert.hpp>
@@ -36,7 +36,6 @@ inline HANDLE open_raw_http_queue() {
   BOOST_ASSERT(retCode == NO_ERROR);
   return hReqQueue;
 }
-
 
 using queue = basic_http_queue_handle<net::any_io_executor>;
 using controller = basic_http_controller<net::any_io_executor>;

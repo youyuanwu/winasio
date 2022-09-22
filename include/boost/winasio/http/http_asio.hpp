@@ -31,7 +31,8 @@ template <typename Executor, typename DynamicBuffer>
 class async_receive_op : boost::asio::coroutine {
 public:
   typedef Executor executor_type;
-  async_receive_op(basic_http_queue_handle<executor_type> &h, DynamicBuffer &buff)
+  async_receive_op(basic_http_queue_handle<executor_type> &h,
+                   DynamicBuffer &buff)
       : h_(h), buff_(buff), state_(state::idle) {}
 
   template <typename Self>
@@ -101,8 +102,8 @@ template <typename Executor, typename DynamicBuffer>
 class async_receive_body_op : boost::asio::coroutine {
 public:
   typedef Executor executor_type;
-  async_receive_body_op(basic_http_queue_handle<executor_type> &h, HTTP_REQUEST_ID id,
-                        DynamicBuffer &buff)
+  async_receive_body_op(basic_http_queue_handle<executor_type> &h,
+                        HTTP_REQUEST_ID id, DynamicBuffer &buff)
       : h_(h), id_(id), buff_(buff), state_(state::idle) {}
 
   template <typename Self>
@@ -174,8 +175,9 @@ template <typename Executor, typename DynamicBuffer,
           BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
                                                std::size_t))
               Token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(Executor)>
-auto async_receive_body(basic_http_queue_handle<Executor> &h, HTTP_REQUEST_ID id,
-                        DynamicBuffer &buffer, Token &&token) {
+auto async_receive_body(basic_http_queue_handle<Executor> &h,
+                        HTTP_REQUEST_ID id, DynamicBuffer &buffer,
+                        Token &&token) {
 
   return boost::asio::async_compose<Token, void(boost::system::error_code,
                                                 std::size_t)>(

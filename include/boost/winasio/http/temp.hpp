@@ -31,7 +31,8 @@ class http_connection
 public:
   typedef Executor executor_type;
 
-  http_connection(winnet::http::basic_http_queue_handle<executor_type> &queue_handle)
+  http_connection(
+      winnet::http::basic_http_queue_handle<executor_type> &queue_handle)
       : http_connection(queue_handle,
                         [](const winnet::http::simple_request &request,
                            winnet::http::simple_response &response) {
@@ -40,10 +41,11 @@ public:
                           response.set_reason("Not Implemented");
                         }) {}
 
-  http_connection(winnet::http::basic_http_queue_handle<executor_type> &queue_handle,
-                  std::function<void(const winnet::http::simple_request &,
-                                     winnet::http::simple_response &)>
-                      handler)
+  http_connection(
+      winnet::http::basic_http_queue_handle<executor_type> &queue_handle,
+      std::function<void(const winnet::http::simple_request &,
+                         winnet::http::simple_response &)>
+          handler)
       : queue_handle_(queue_handle), request_(), response_(),
         handler_(handler) {}
 
