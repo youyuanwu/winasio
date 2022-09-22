@@ -45,61 +45,47 @@ private:
 
 template <HTTP_VERSION http_version> 
 class http_initializer {
-};
-
-template <>
-class http_initializer<HTTP_VERSION::http_ver_1> {
 public:
-  http_initializer() {
-    DWORD retCode =
-        HttpInitialize(HTTPAPI_VERSION_1,
-                       HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, // Flags
-                       NULL // Reserved
-        );
-    BOOST_ASSERT(retCode == NO_ERROR);
-    retCode = HttpCreateHttpHandle(&req_queue_, // Req Queue
-                                   0            // Reserved
-    );
-    BOOST_ASSERT(retCode == NO_ERROR);
+  http_initializer() { 
+      do_init();
   }
-  HANDLE get_raw_http_queue() {
-    return req_queue_;
-  }
+  HANDLE get_raw_http_queue() { return req_queue_; }
   ~http_initializer() {
     DWORD retCode =
         HttpTerminate(HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, NULL);
     BOOST_ASSERT(retCode == NO_ERROR);
   }
 private:
+  void do_init();
   HANDLE req_queue_ = nullptr;
 };
 
 template <> 
-class http_initializer<HTTP_VERSION::http_ver_2> {
-public:
-  http_initializer() {
-    DWORD retCode =
-        HttpInitialize(HTTPAPI_VERSION_2, HTTP_INITIALIZE_SERVER, nullptr);
+void http_initializer<HTTP_VERSION::http_ver_1>::do_init() {
+  DWORD retCode =
+    HttpInitialize(HTTPAPI_VERSION_1,
+                   HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, // Flags
+                   nullptr                                          // Reserved
+    );
     BOOST_ASSERT(retCode == NO_ERROR);
-    retCode = HttpCreateRequestQueue(HTTPAPI_VERSION_2,
-                                     L"Test_Http_Server_HTTPAPI_V2",
-                                     nullptr, 0, &req_queue_);
-    BOOST_ASSERT(retCode == NO_ERROR);
-  }
-  HANDLE get_raw_http_queue() { 
-      return req_queue_;
-  }
+    retCode = HttpCreateHttpHandle(&req_queue_, // Req Queue
+                                   0            // Reserved
+);
+BOOST_ASSERT(retCode == NO_ERROR);
+}
 
-  ~http_initializer() {
-    DWORD retCode =
-        HttpTerminate(HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, NULL);
-    BOOST_ASSERT(retCode == NO_ERROR);
-  }
-
-private:
-  HANDLE req_queue_ = nullptr;
-};
-
+template <> 
+void http_initializer<HTTP_VERSION::http_ver_2>::do_init() {
+  DWORD retCode =
+      HttpInitialize(HTTPAPI_VERSION_2,
+                     HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, 
+                     nullptr);
+  BOOST_ASSERT(retCode == NO_ERROR);
+  retCode = HttpCreateRequestQueue(HTTPAPI_VERSION_2,
+                                    L"Test_Http_Server_HTTPAPI_V2",
+                                    nullptr, 0, &req_queue_);
+  BOOST_ASSERT(retCode == NO_ERROR);
+}
 } // namespace http
 } // namespace winasio
 } // namespace boost

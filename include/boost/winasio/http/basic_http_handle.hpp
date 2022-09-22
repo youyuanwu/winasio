@@ -77,7 +77,7 @@ namespace winnet = net::windows;
       }
       void set_queue_handler(HANDLE queue_handler, system::error_code &ec) {
         queue_handler_ = queue_handler;
-        HTTP_BINDING_INFO binding_info;
+        HTTP_BINDING_INFO binding_info {};
         binding_info.RequestQueueHandle = queue_handler_;
         binding_info.Flags.Present = 1;
         DWORD retCode =
