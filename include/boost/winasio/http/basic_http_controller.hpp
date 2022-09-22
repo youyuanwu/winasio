@@ -5,7 +5,7 @@
 #pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include <boost/winasio/http/basic_http_queue.hpp>
+#include <boost/winasio/http/basic_http_queue_handle.hpp>
 #include <boost/winasio/http/basic_http_request_context.hpp>
 #include <boost/winasio/http/convert.hpp>
 #include <boost/winasio/http/http_asio.hpp>
@@ -31,7 +31,7 @@ public:
   using request_handler = std::function<void(request_context &ctx)>;
 
 public:
-  basic_http_controller(basic_http_queue<Executor> &queue,
+  basic_http_controller(basic_http_queue_handle<Executor> &queue,
                         const std::wstring &url_base)
       : queue_(queue), base_url_(format_url_base(url_base)) {
     boost::system::error_code ec;
@@ -149,7 +149,7 @@ private:
            std::array<request_handler, HTTP_VERB::HttpVerbMaximum>>
       handlers_;
   const std::wstring base_url_;
-  basic_http_queue<Executor> &queue_;
+  basic_http_queue_handle<Executor> &queue_;
 };
 
 } // namespace http

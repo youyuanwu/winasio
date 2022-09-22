@@ -8,7 +8,7 @@
 #include <boost/asio.hpp>
 #include <boost/winasio/http/basic_http_request_context.hpp>
 #include <boost/winasio/http/basic_http_controller.hpp>
-#include <boost/winasio/http/basic_http_queue.hpp>
+#include <boost/winasio/http/basic_http_queue_handle.hpp>
 #include <boost/winasio/http/basic_http_url.hpp>
 
 #include <boost/winasio/http/convert.hpp>
@@ -38,7 +38,7 @@ inline HANDLE open_raw_http_queue() {
 }
 
 
-using queue = basic_http_queue<net::any_io_executor>;
+using queue = basic_http_queue_handle<net::any_io_executor>;
 using controller = basic_http_controller<net::any_io_executor>;
 namespace v1 {
 using url = basic_http_url<net::any_io_executor>;

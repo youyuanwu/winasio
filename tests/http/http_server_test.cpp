@@ -45,7 +45,7 @@ TEST(HTTPServer, server) {
   net::io_context io_context;
 
   // open queue handle
-  winnet::http::basic_http_queue<net::io_context::executor_type> queue(
+  winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(winnet::http::open_raw_http_queue());
   winnet::http::basic_http_url simple_url(queue, url);
@@ -112,7 +112,7 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   net::io_context io_context;
 
   // open queue handle
-  winnet::http::basic_http_queue<net::io_context::executor_type> queue(
+  winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(winnet::http::open_raw_http_queue());
   winnet::http::basic_http_url simple_url(queue, url);
