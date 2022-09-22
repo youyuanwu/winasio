@@ -36,7 +36,7 @@ public:
   // callbacks
   asio_request_context(const executor_type &ex)
       : ex_(ex), on_send_request_complete(), on_headers_available(),
-        on_data_available(), on_read_complete(), state_(state::idle) {}
+        on_data_available(), on_read_complete(), on_send_request_failed(), state_(state::idle) {}
 
   void set_state(state s) noexcept { state_ = s; }
 
@@ -54,6 +54,9 @@ public:
 
   // need to invoke query data inside
   net::windows::overlapped_ptr on_read_complete;
+
+  // need to invoke send http request failure
+  net::windows::overlapped_ptr on_send_request_failed;
 
   executor_type get_executor() { return ex_; }
 
@@ -127,6 +130,12 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     // Prepare the request handle to receive a response.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::send_request);
     cpContext->on_send_request_complete.complete(ec, 0);
+    break;
+  case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR:
+    BOOST_LOG_TRIVIAL(error)
+        << L"Sending HTTP request Error: " << dwStatusInformationLength;
+    ec = boost::system::error_code(::GetLastError(), boost::system::system_category());
+    cpContext->on_send_request_failed.complete(ec, 0);
     break;
   default:
     BOOST_LOG_TRIVIAL(debug) << L"Unknown/unhandled callback - status "
