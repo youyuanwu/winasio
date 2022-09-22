@@ -14,7 +14,7 @@ get_known_headers_all(PHTTP_REQUEST req,
   PHTTP_KNOWN_HEADER known_headers = req->Headers.KnownHeaders;
   size_t count =
       sizeof(req->Headers.KnownHeaders) / sizeof(req->Headers.KnownHeaders[0]);
-  for (int i = 0; i < count; i++) {
+  for (size_t i = 0; i < count; ++i) {
     HTTP_KNOWN_HEADER &header = known_headers[i];
     if (header.RawValueLength == 0) {
       continue;
@@ -45,7 +45,7 @@ get_unknown_headers_all(PHTTP_REQUEST req,
     return;
   }
   PHTTP_UNKNOWN_HEADER unknown_headers = req->Headers.pUnknownHeaders;
-  for (int i = 0; i < count; i++) {
+  for (size_t i = 0; i < count; ++i) {
     HTTP_UNKNOWN_HEADER &header = unknown_headers[i];
     headers[std::string(header.pName, header.pName + header.NameLength)] =
         std::string(header.pRawValue, header.pRawValue + header.RawValueLength);
@@ -73,7 +73,7 @@ public:
     return phttp_request(buff);
   }
 
-  inline HTTP_REQUEST_ID get_request_id() {
+  inline HTTP_REQUEST_ID get_request_id() const {
     return this->get_request()->RequestId;
   }
 

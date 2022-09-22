@@ -1,19 +1,28 @@
+#ifndef BOOST_WINASIO_HTTP_HPP
+#define BOOST_WINASIO_HTTP_HPP
+
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
 #pragma once
+#endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "boost/asio.hpp"
+#include <boost/asio.hpp>
+#include <boost/winasio/http/basic_http_controller.hpp>
+#include <boost/winasio/http/basic_http_queue_handle.hpp>
+#include <boost/winasio/http/basic_http_request_context.hpp>
+#include <boost/winasio/http/basic_http_url.hpp>
+
+#include <boost/winasio/http/convert.hpp>
+#include <boost/winasio/http/http_asio.hpp>
+#include <boost/winasio/http/http_initializer.hpp>
+
+#include <boost/assert.hpp>
+
 #include <http.h>
-
-#include "boost/winasio/http/basic_http_handle.hpp"
-
-#include "boost/assert.hpp"
-
 #pragma comment(lib, "httpapi.lib")
 
 namespace boost {
 namespace winasio {
 namespace http {
-
-namespace net = boost::asio;
 
 // open the queue handle
 // caller takes ownership
@@ -28,45 +37,13 @@ inline HANDLE open_raw_http_queue() {
   return hReqQueue;
 }
 
-// simple register and auto remove url
-template <typename Executor> class http_simple_url {
-public:
-  typedef Executor executor_type;
-  http_simple_url(basic_http_handle<executor_type> &queue_handle,
-                  std::wstring url)
-      : queue_handle_(queue_handle), url_(url) {
-    boost::system::error_code ec;
-    queue_handle_.add_url(url_, ec);
-    BOOST_ASSERT(!ec.failed());
-  }
-
-  ~http_simple_url() {
-    boost::system::error_code ec;
-    queue_handle_.remove_url(url_, ec);
-    BOOST_ASSERT(!ec.failed());
-  }
-
-private:
-  basic_http_handle<executor_type> &queue_handle_;
-  std::wstring url_;
-};
-
-class http_initializer {
-public:
-  http_initializer() {
-    DWORD retCode =
-        HttpInitialize(HTTPAPI_VERSION_1,
-                       HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, // Flags
-                       NULL // Reserved
-        );
-    BOOST_ASSERT(retCode == NO_ERROR);
-  }
-  ~http_initializer() {
-    DWORD retCode =
-        HttpTerminate(HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, NULL);
-    BOOST_ASSERT(retCode == NO_ERROR);
-  }
-};
+using queue = basic_http_queue_handle<net::any_io_executor>;
+using controller = basic_http_controller<net::any_io_executor>;
+namespace v1 {
+using url = basic_http_url<net::any_io_executor>;
+} // namespace v1
 } // namespace http
 } // namespace winasio
 } // namespace boost
+
+#endif // BOOST_WINASIO_HTTP_HPP

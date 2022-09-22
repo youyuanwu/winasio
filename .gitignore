@@ -1,2 +1,7 @@
 build
+bin
+.vs
 .vscode
+
+#vs project for headers.
+winasio.http

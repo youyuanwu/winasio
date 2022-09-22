@@ -1,4 +1,6 @@
-#include "boost/winasio/http/temp.hpp"
+#include <boost/winasio/http/http.hpp>
+#include <boost/winasio/http/temp.hpp>
+
 #include "gtest/gtest.h"
 
 #include "beast_client.hpp"
@@ -25,6 +27,7 @@ namespace net = boost::asio;    // from <boost/asio.hpp>
 using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 namespace logging = boost::log;
+namespace winnet = boost::winasio;
 
 void log_init() {
   logging::core::get()->set_filter(logging::trivial::severity >=
@@ -42,10 +45,10 @@ TEST(HTTPServer, server) {
   net::io_context io_context;
 
   // open queue handle
-  winnet::http::basic_http_handle<net::io_context::executor_type> queue(
+  winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(winnet::http::open_raw_http_queue());
-  winnet::http::http_simple_url simple_url(queue, url);
+  winnet::http::basic_http_url simple_url(queue, url);
 
   auto handler = [](const winnet::http::simple_request &request,
                     winnet::http::simple_response &response) {
@@ -109,10 +112,10 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   net::io_context io_context;
 
   // open queue handle
-  winnet::http::basic_http_handle<net::io_context::executor_type> queue(
+  winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(winnet::http::open_raw_http_queue());
-  winnet::http::http_simple_url simple_url(queue, url);
+  winnet::http::basic_http_url simple_url(queue, url);
 
   winnet::http::simple_request rq;
   boost::system::error_code cncl_ec;
@@ -131,4 +134,44 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   t.join();
 
   ASSERT_TRUE(cncl_ec.value() == 995); // cancelled.
+}
+
+TEST(HTTPServer, server_url_register_api) {
+  // init http module
+  winnet::http::http_initializer init;
+
+  boost::system::error_code ec;
+  net::io_context ctx;
+
+  // open queue handle
+  winnet::http::queue queue(ctx, winnet::http::open_raw_http_queue());
+
+  winnet::http::controller controller(queue, L"http://localhost:1337/");
+
+  controller.get(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(200);
+                 });
+
+  controller.post(L"/url-123",
+                  [](winnet::http::controller::request_context &ctx) {
+                    ctx.response.set_body("Hello world");
+                    ctx.response.set_status_code(201);
+                  });
+
+  controller.put(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(204);
+                 });
+
+  controller.del(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(200);
+                 });
+
+  controller.start();
+  // ctx.run();
 }
