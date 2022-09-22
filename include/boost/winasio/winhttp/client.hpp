@@ -18,6 +18,7 @@ public:
   std::optional<header::accept_types> accept;
   std::optional<header::headers> header;
   std::optional<std::string> body;
+  bool insecure_skip_verify;
 };
 
 namespace details {
@@ -108,6 +109,23 @@ void async_exec(payload &p, basic_winhttp_connect_handle<Executor> &h_connect,
   if (ec) {
     net::post(h_request.get_executor(), std::bind(token, ec, 0));
     return;
+  }
+
+  // skip cert check
+  if (p.secure && p.insecure_skip_verify) {
+    // disable all sec checks
+    // may need to revert this
+    DWORD dwSecurityFlags = SECURITY_FLAG_IGNORE_CERT_CN_INVALID |
+                            SECURITY_FLAG_IGNORE_CERT_DATE_INVALID |
+                            SECURITY_FLAG_IGNORE_UNKNOWN_CA |
+                            SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
+    h_request.set_option(WINHTTP_OPTION_SECURITY_FLAGS, (PVOID)&dwSecurityFlags,
+                         sizeof(dwSecurityFlags), ec);
+    if (ec) {
+      BOOST_LOG_TRIVIAL(debug) << L"set_option for security failed: " << ec;
+      net::post(h_request.get_executor(), std::bind(token, ec, 0));
+      return;
+    }
   }
 
   LPCWSTR lpszHeaders = NULL;

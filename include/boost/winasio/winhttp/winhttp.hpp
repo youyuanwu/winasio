@@ -139,6 +139,19 @@ public:
                                WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS, ec);
   }
 
+  // set option
+  void set_option(_In_ DWORD dwOption, _In_ LPVOID lpBuffer,
+                  _In_ DWORD dwBufferLength,
+                  _Out_ boost::system::error_code &ec) {
+    bool ok = WinHttpSetOption(this->native_handle(), dwOption, lpBuffer,
+                               dwBufferLength);
+    if (!ok) {
+      ec = boost::system::error_code(GetLastError(),
+                                     boost::asio::error::get_system_category());
+    }
+    BOOST_LOG_TRIVIAL(debug) << "WinHttpSetOption: status: " << ec;
+  }
+
   executor_type get_executor() { return ex_; }
 
 private:
@@ -404,6 +417,19 @@ void get_all_raw_crlf(basic_winhttp_request_handle<Executor> &h,
                       _Out_ boost::system::error_code &ec,
                       _Out_ std::wstring &data) {
   get_string_header_helper(h, WINHTTP_QUERY_RAW_HEADERS_CRLF, ec, data);
+}
+
+template <typename Executor = net::any_io_executor>
+void get_trailers(basic_winhttp_request_handle<Executor> &h,
+                  _Out_ boost::system::error_code &ec,
+                  _Out_ std::wstring &data) {
+  // Trailer has to be queried together with crlf
+  // only trailer will be returned.
+  // See:
+  // https://github.com/dotnet/runtime/blob/4cbe6f99d23e04c56a89251d49de1b0f14000427/src/libraries/System.Net.Http.WinHttpHandler/src/System/Net/Http/WinHttpResponseParser.cs#L230
+  get_string_header_helper(
+      h, WINHTTP_QUERY_FLAG_TRAILERS | WINHTTP_QUERY_RAW_HEADERS_CRLF, ec,
+      data);
 }
 
 // add a single header. multiple might also work

@@ -128,6 +128,14 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::send_request);
     cpContext->on_send_request_complete.complete(ec, 0);
     break;
+  case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
+    WINHTTP_ASYNC_RESULT *pAR = (WINHTTP_ASYNC_RESULT *)lpvStatusInformation;
+    std::wstring err;
+    winnet::winhttp::error::get_api_error_str(pAR, err);
+    BOOST_LOG_TRIVIAL(debug) << "winhttp callback error: " << err;
+    ec.assign(pAR->dwError, boost::asio::error::get_system_category());
+    // TODO: invoke handler
+  } break;
   default:
     BOOST_LOG_TRIVIAL(debug) << L"Unknown/unhandled callback - status "
                              << dwInternetStatus << L"given";
@@ -276,23 +284,26 @@ public:
       h_request_.async_query_data_available(std::move(self));
       break;
     case state::query_data: {
-      if (len == 0) {
-        // no more data. request done and success
-        state_ = state::done;
-        self.complete(ec, 0); // TODO total len;
-      } else {
-        state_ = state::read_data;
-        auto buff = this->buff_.prepare(len + 1);
-        h_request_.async_read_data((LPVOID)buff.data(), static_cast<DWORD>(len),
-                                   std::move(self));
-      }
+      // no more data.
+      // If do not need trailers, request done and success.
+      // If need trailers, we need to call read data and it will return 0 bytes
+      // read and populate trailers.
+      state_ = state::read_data;
+      auto buff = this->buff_.prepare(len + 1); // always prepare 1 more byte.
+      h_request_.async_read_data((LPVOID)buff.data(), static_cast<DWORD>(len),
+                                 std::move(self));
     } break;
     case state::read_data:
-      BOOST_ASSERT(len != 0); // data queried is not 0 but read 0
-      this->buff_.commit(len);
-      // Check for more data.
-      state_ = state::query_data;
-      h_request_.async_query_data_available(std::move(self));
+      if (len != 0) {
+        this->buff_.commit(len);
+        // Check for more data.
+        state_ = state::query_data;
+        h_request_.async_query_data_available(std::move(self));
+      } else {
+        BOOST_LOG_TRIVIAL(debug) << L"state::read_data complete";
+        state_ = state::done;
+        self.complete(ec, 0); // TODO total len;
+      }
       break;
     default:
       BOOST_ASSERT_MSG(false, "unknown state");
