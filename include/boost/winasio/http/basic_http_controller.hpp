@@ -1,7 +1,12 @@
 #ifndef BOOST_WINASIO_BASIC_HTTP_CONTROLLER_HPP
 #define BOOST_WINASIO_BASIC_HTTP_CONTROLLER_HPP
 
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#pragma once
+#endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
+
 #include <boost/winasio/http/basic_http_queue.hpp>
+#include <boost/winasio/http/basic_http_request_context.hpp>
 #include <boost/winasio/http/convert.hpp>
 #include <boost/winasio/http/http_asio.hpp>
 
@@ -20,10 +25,10 @@ namespace net = boost::asio;
 template <typename Executor = net::any_io_executor>
 class basic_http_controller {
 
-  using request_handler =
-      std::function<void(const simple_request &, simple_response &)>;
-  using request_response =
-      std::pair<http::simple_request, http::simple_response>;
+public:
+  using request_context =
+      basic_http_request_context<simple_request, simple_response>;
+  using request_handler = std::function<void(request_context &ctx)>;
 
 public:
   basic_http_controller(basic_http_queue<Executor> &queue,
@@ -92,16 +97,20 @@ private:
   }
 
   void receive_next_request() {
-    auto rq = std::make_shared<request_response>();
+    // We want the request to stay const after, but when
+    // we read into it, it's okay.
+    auto rq = std::make_shared<request_context>();
     http::async_receive(
-        queue_, rq->first.get_request_dynamic_buffer(),
+        queue_,
+        const_cast<simple_request &>(rq->request).get_request_dynamic_buffer(),
         [this, rq](const boost::system::error_code &ec, size_t) {
           receive_next_request();
           if (ec)
             return;
           http::async_receive_body(
-              queue_, rq->first.get_request_id(),
-              rq->first.get_body_dynamic_buffer(),
+              queue_, rq->request.get_request_id(),
+              const_cast<simple_request &>(rq->request)
+                  .get_body_dynamic_buffer(),
               [this, rq](const boost::system::error_code &ec, size_t) {
                 if (!ec)
                   dispatch(*rq);
@@ -109,9 +118,9 @@ private:
         });
   }
 
-  void dispatch(request_response &rq) {
+  void dispatch(request_context &rq) {
 
-    auto *prq = rq.first.get_request();
+    auto *prq = rq.request.get_request();
     const auto *url_b = prq->CookedUrl.pFullUrl;
     const auto *url_e =
         prq->CookedUrl.pQueryString == nullptr
@@ -123,14 +132,14 @@ private:
 
     if (handlers_.find(url) == handlers_.end() ||
         handlers_[url].at(prq->Verb) == nullptr) {
-      rq.second.set_status_code(404);
-      rq.second.set_reason("Not found");
+      rq.response.set_status_code(404);
+      rq.response.set_reason("Not found");
     } else {
-      rq.second.set_status_code(200); // default to 200
-      handlers_[url].at(prq->Verb)(rq.first, rq.second);
+      rq.response.set_status_code(200); // default to 200
+      handlers_[url].at(prq->Verb)(rq);
     }
     queue_.async_send_response(
-        rq.second.get_response(), rq.first.get_request_id(),
+        rq.response.get_response(), rq.request.get_request_id(),
         HTTP_SEND_RESPONSE_FLAG_DISCONNECT,
         [rq](const boost::system::error_code &ec, size_t) {});
   }

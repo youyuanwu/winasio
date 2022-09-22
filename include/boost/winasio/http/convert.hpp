@@ -73,7 +73,7 @@ public:
     return phttp_request(buff);
   }
 
-  inline HTTP_REQUEST_ID get_request_id() {
+  inline HTTP_REQUEST_ID get_request_id() const {
     return this->get_request()->RequestId;
   }
 

@@ -1,7 +1,12 @@
 #ifndef BOOST_WINASIO_HTTP_HPP
 #define BOOST_WINASIO_HTTP_HPP
 
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#pragma once
+#endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
+
 #include <boost/asio.hpp>
+#include <boost/winasio/http/basic_http_request_context.hpp>
 #include <boost/winasio/http/basic_http_controller.hpp>
 #include <boost/winasio/http/basic_http_queue.hpp>
 #include <boost/winasio/http/basic_http_url.hpp>
@@ -32,10 +37,11 @@ inline HANDLE open_raw_http_queue() {
   return hReqQueue;
 }
 
-using queue = basic_http_queue<net::io_context::executor_type>;
-using controller = basic_http_controller<net::io_context::executor_type>;
+
+using queue = basic_http_queue<net::any_io_executor>;
+using controller = basic_http_controller<net::any_io_executor>;
 namespace v1 {
-using url = basic_http_url<net::io_context::executor_type>;
+using url = basic_http_url<net::any_io_executor>;
 } // namespace v1
 } // namespace http
 } // namespace winasio

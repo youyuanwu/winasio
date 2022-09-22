@@ -1,6 +1,10 @@
 #ifndef BOOST_WINASIO_BASIC_HTTP_QUEUE_HPP
 #define BOOST_WINASIO_BASIC_HTTP_QUEUE_HPP
 
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#pragma once
+#endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
+
 #include <http.h>
 
 #include <boost/asio/detail/config.hpp>

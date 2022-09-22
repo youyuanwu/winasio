@@ -148,30 +148,30 @@ TEST(HTTPServer, server_url_register_api) {
 
   winnet::http::controller controller(queue, L"http://localhost:1337/");
 
-  controller.get(L"/url-123", [](const winnet::http::simple_request &rq,
-                                 winnet::http::simple_response &rsp) {
-    rsp.set_body("Hello world");
-    rsp.set_status_code(200);
-  });
+  controller.get(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(200);
+                 });
 
-  controller.post(L"/url-123", [](const winnet::http::simple_request &rq,
-                                  winnet::http::simple_response &rsp) {
-    rsp.set_body("Hello world");
-    rsp.set_status_code(201);
-  });
+  controller.post(L"/url-123",
+                  [](winnet::http::controller::request_context &ctx) {
+                    ctx.response.set_body("Hello world");
+                    ctx.response.set_status_code(201);
+                  });
 
-  controller.put(L"/url-123", [](const winnet::http::simple_request &rq,
-                                 winnet::http::simple_response &rsp) {
-    rsp.set_body("Hello world");
-    rsp.set_status_code(204);
-  });
+  controller.put(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(204);
+                 });
 
-  controller.del(L"/url-123", [](const winnet::http::simple_request &rq,
-                                 winnet::http::simple_response &rsp) {
-    rsp.set_body("Hello world");
-    rsp.set_status_code(200);
-  });
+  controller.del(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(200);
+                 });
 
   controller.start();
-  //ctx.run();
+  // ctx.run();
 }
