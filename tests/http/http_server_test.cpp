@@ -28,21 +28,21 @@ void log_init() {
                                    logging::trivial::debug);
 }
 
-TEST(HTTPServer, server) {
-  log_init();
+template <winnet::http::HTTP_VERSION http_ver>
+void http_server_test_helper() {
   // init http module
-  winnet::http::http_initializer init;
+  winnet::http::http_initializer<http_ver> init;
   // add https then this becomes https server
   std::wstring url = L"http://localhost:12356/winhttpapitest/";
-
   boost::system::error_code ec;
   net::io_context io_context;
 
   // open queue handle
   winnet::http::basic_http_handle<net::io_context::executor_type> queue(
       io_context);
-  queue.assign(winnet::http::open_raw_http_queue());
-  winnet::http::http_simple_url simple_url(queue, url);
+  queue.assign(init.get_raw_http_queue());
+  winnet::http::http_simple_url<net::io_context::executor_type, http_ver>
+      simple_url(queue, url);
 
   auto handler = [](const winnet::http::simple_request &request,
                     winnet::http::simple_response &response) {
@@ -94,4 +94,12 @@ TEST(HTTPServer, server) {
       thread.join();
     }
   }
+}
+
+TEST(HTTPServer, server_http_v1) {
+  http_server_test_helper<winnet::http::HTTP_VERSION::http_ver_1>();
+}
+
+TEST(HTTPServer, server_http_v2) {
+  http_server_test_helper<winnet::http::HTTP_VERSION::http_ver_2>();
 }
