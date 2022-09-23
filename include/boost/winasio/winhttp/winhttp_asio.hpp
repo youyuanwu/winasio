@@ -42,7 +42,7 @@ public:
 
   state get_state() const noexcept { return state_; }
 
-  // need to invoke recieve response inside
+  // need to invoke receive response inside
   net::windows::overlapped_ptr on_send_request_complete;
 
   // need to invoke query data inside
@@ -131,12 +131,15 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::send_request);
     cpContext->on_send_request_complete.complete(ec, 0);
     break;
-  case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR:
-    BOOST_LOG_TRIVIAL(error)
-        << L"Sending HTTP request Error: " << dwStatusInformationLength;
-    ec = boost::system::error_code(::GetLastError(), boost::system::system_category());
+  case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
+    WINHTTP_ASYNC_RESULT *pAR = (WINHTTP_ASYNC_RESULT *)lpvStatusInformation;
+    std::wstring err;
+    winnet::winhttp::error::get_api_error_str(pAR, err);
+    BOOST_LOG_TRIVIAL(debug) << "winhttp callback error: " << err;
+    ec.assign(pAR->dwError, boost::asio::error::get_system_category());
+    // TODO: invoke handler
     cpContext->on_send_request_failed.complete(ec, 0);
-    break;
+  } break;
   default:
     BOOST_LOG_TRIVIAL(debug) << L"Unknown/unhandled callback - status "
                              << dwInternetStatus << L"given";
@@ -144,7 +147,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
   }
 }
 
-// wrapper for requeset handle to perform async operations
+// wrapper for request handle to perform async operations
 template <typename Executor = net::any_io_executor>
 class basic_winhttp_request_asio_handle
     : public basic_winhttp_request_handle<Executor> {
@@ -181,7 +184,7 @@ public:
   }
 
   // easy managed open using managed asio callback and ctx
-  // open is always sychronous.
+  // open is always synchronous.
   void managed_open(HINTERNET hConnect, LPCWSTR method, LPCWSTR path,
                     boost::system::error_code &ec) {
     managed_open(hConnect, method, path,
@@ -195,7 +198,7 @@ public:
   // one needs to call sync open before send.
   // async has all the same param with sync version
   // but has handler token.
-  // winttp callback case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE
+  // winhttp callback case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE
   // size_t param is not used
   template <typename Handler>
   void async_send(LPCWSTR lpszHeaders, DWORD dwHeadersLength, LPVOID lpOptional,
@@ -216,7 +219,7 @@ public:
 
   // callback case: WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE
   // size_t param is not used
-  template <typename Handler> void async_recieve_response(Handler &&token) {
+  template <typename Handler> void async_receive_response(Handler &&token) {
     boost::system::error_code ec;
     ctx_.set_state(ctx_state_type::headers_available);
     ctx_.on_headers_available.reset(ctx_.get_executor(), std::move(token));
@@ -227,7 +230,7 @@ public:
     }
   }
 
-  // can be invoke in async_recieve_response or ...
+  // can be invoke in async_receive_response or ...
   // callback case : WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE
   template <typename Handler> void async_query_data_available(Handler &&token) {
     boost::system::error_code ec;
@@ -285,23 +288,26 @@ public:
       h_request_.async_query_data_available(std::move(self));
       break;
     case state::query_data: {
-      if (len == 0) {
-        // no more data. request done and success
-        state_ = state::done;
-        self.complete(ec, 0); // TODO total len;
-      } else {
-        state_ = state::read_data;
-        auto buff = this->buff_.prepare(len + 1);
-        h_request_.async_read_data((LPVOID)buff.data(), static_cast<DWORD>(len),
-                                   std::move(self));
-      }
+      // no more data.
+      // If do not need trailers, request done and success.
+      // If need trailers, we need to call read data and it will return 0 bytes
+      // read and populate trailers.
+      state_ = state::read_data;
+      auto buff = this->buff_.prepare(len + 1); // always prepare 1 more byte.
+      h_request_.async_read_data((LPVOID)buff.data(), static_cast<DWORD>(len),
+                                 std::move(self));
     } break;
     case state::read_data:
-      BOOST_ASSERT(len != 0); // data queried is not 0 but read 0
-      this->buff_.commit(len);
-      // Check for more data.
-      state_ = state::query_data;
-      h_request_.async_query_data_available(std::move(self));
+      if (len != 0) {
+        this->buff_.commit(len);
+        // Check for more data.
+        state_ = state::query_data;
+        h_request_.async_query_data_available(std::move(self));
+      } else {
+        BOOST_LOG_TRIVIAL(debug) << L"state::read_data complete";
+        state_ = state::done;
+        self.complete(ec, 0); // TODO total len;
+      }
       break;
     default:
       BOOST_ASSERT_MSG(false, "unknown state");
@@ -317,7 +323,7 @@ private:
 } // namespace details
 
 // async read all body into buffer
-// use this in async_recieve_response handler
+// use this in async_receive_response handler
 // handler signature void(ec, size_t)
 template <typename Executor, typename DynamicBuffer,
           BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,

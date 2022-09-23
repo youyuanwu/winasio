@@ -1,4 +1,6 @@
-#include "boost/winasio/http/temp.hpp"
+#include <boost/winasio/http/http.hpp>
+#include <boost/winasio/http/temp.hpp>
+
 #include "gtest/gtest.h"
 
 #include "beast_client.hpp"
@@ -13,8 +15,11 @@
 #include <boost/log/expressions.hpp>
 #include <boost/log/trivial.hpp>
 
+#include <chrono>
 #include <cstdio>
 #include <utility>
+
+using namespace std::chrono_literals;
 
 namespace beast = boost::beast; // from <boost/beast.hpp>
 namespace http = beast::http;   // from <boost/beast/http.hpp>
@@ -22,6 +27,7 @@ namespace net = boost::asio;    // from <boost/asio.hpp>
 using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 namespace logging = boost::log;
+namespace winnet = boost::winasio;
 
 void log_init() {
   logging::core::get()->set_filter(logging::trivial::severity >=
@@ -39,10 +45,10 @@ TEST(HTTPServer, server) {
   net::io_context io_context;
 
   // open queue handle
-  winnet::http::basic_http_handle<net::io_context::executor_type> queue(
+  winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(winnet::http::open_raw_http_queue());
-  winnet::http::http_simple_url simple_url(queue, url);
+  winnet::http::basic_http_url simple_url(queue, url);
 
   auto handler = [](const winnet::http::simple_request &request,
                     winnet::http::simple_response &response) {
@@ -94,4 +100,78 @@ TEST(HTTPServer, server) {
       thread.join();
     }
   }
+}
+
+TEST(HTTPServer, server_shutsdown_gracefully) {
+  // init http module
+  winnet::http::http_initializer init;
+  // add https then this becomes https server
+  std::wstring url = L"http://localhost:12356/winhttpapitest/";
+
+  boost::system::error_code ec;
+  net::io_context io_context;
+
+  // open queue handle
+  winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
+      io_context);
+  queue.assign(winnet::http::open_raw_http_queue());
+  winnet::http::basic_http_url simple_url(queue, url);
+
+  winnet::http::simple_request rq;
+  boost::system::error_code cncl_ec;
+  winnet::http::async_receive(queue, rq.get_request_dynamic_buffer(),
+                              [&cncl_ec](const boost::system::error_code &ec,
+                                         size_t) { cncl_ec = ec; });
+
+  std::thread t([&]() {
+    std::this_thread::sleep_for(300ms);
+    boost::system::error_code ec;
+    queue.shutdown(ec);
+  });
+
+  io_context.run();
+
+  t.join();
+
+  ASSERT_TRUE(cncl_ec.value() == 995); // cancelled.
+}
+
+TEST(HTTPServer, server_url_register_api) {
+  // init http module
+  winnet::http::http_initializer init;
+
+  boost::system::error_code ec;
+  net::io_context ctx;
+
+  // open queue handle
+  winnet::http::queue queue(ctx, winnet::http::open_raw_http_queue());
+
+  winnet::http::controller controller(queue, L"http://localhost:1337/");
+
+  controller.get(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(200);
+                 });
+
+  controller.post(L"/url-123",
+                  [](winnet::http::controller::request_context &ctx) {
+                    ctx.response.set_body("Hello world");
+                    ctx.response.set_status_code(201);
+                  });
+
+  controller.put(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(204);
+                 });
+
+  controller.del(L"/url-123",
+                 [](winnet::http::controller::request_context &ctx) {
+                   ctx.response.set_body("Hello world");
+                   ctx.response.set_status_code(200);
+                 });
+
+  controller.start();
+  // ctx.run();
 }
