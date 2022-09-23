@@ -16,7 +16,7 @@ namespace http {
 template <HTTP_MAJOR_VERSION> class http_initializer {
 public:
   http_initializer() { do_init(); }
-  HANDLE create_http_queue(boost::system::error_code &ec);
+  inline HANDLE create_http_queue(boost::system::error_code &ec);
 
   ~http_initializer() {
     DWORD retCode =
@@ -25,10 +25,11 @@ public:
   }
 
 private:
-  void do_init();
+  inline void do_init();
 };
 
-template <> void http_initializer<HTTP_MAJOR_VERSION::http_ver_1>::do_init() {
+template <>
+inline void http_initializer<HTTP_MAJOR_VERSION::http_ver_1>::do_init() {
   DWORD retCode =
       HttpInitialize(HTTPAPI_VERSION_1,
                      HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, // Flags
@@ -38,7 +39,8 @@ template <> void http_initializer<HTTP_MAJOR_VERSION::http_ver_1>::do_init() {
 }
 
 template <>
-HANDLE http_initializer<HTTP_MAJOR_VERSION::http_ver_1>::create_http_queue(
+inline HANDLE
+http_initializer<HTTP_MAJOR_VERSION::http_ver_1>::create_http_queue(
     boost::system::error_code &ec) {
   HANDLE req_queue = nullptr;
   DWORD retCode = HttpCreateHttpHandle(&req_queue, // Req Queue
@@ -48,7 +50,8 @@ HANDLE http_initializer<HTTP_MAJOR_VERSION::http_ver_1>::create_http_queue(
   return req_queue;
 }
 
-template <> void http_initializer<HTTP_MAJOR_VERSION::http_ver_2>::do_init() {
+template <>
+inline void http_initializer<HTTP_MAJOR_VERSION::http_ver_2>::do_init() {
   DWORD retCode =
       HttpInitialize(HTTPAPI_VERSION_2,
                      HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, nullptr);
@@ -56,7 +59,8 @@ template <> void http_initializer<HTTP_MAJOR_VERSION::http_ver_2>::do_init() {
 }
 
 template <>
-HANDLE http_initializer<HTTP_MAJOR_VERSION::http_ver_2>::create_http_queue(
+inline HANDLE
+http_initializer<HTTP_MAJOR_VERSION::http_ver_2>::create_http_queue(
     boost::system::error_code &ec) {
   HANDLE req_queue = nullptr;
   DWORD retCode =
