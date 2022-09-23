@@ -39,9 +39,6 @@ inline HANDLE open_raw_http_queue() {
 
 using queue = basic_http_queue_handle<net::any_io_executor>;
 using controller = basic_http_controller<net::any_io_executor>;
-namespace v1 {
-using url = basic_http_url<net::any_io_executor>;
-} // namespace v1
 } // namespace http
 } // namespace winasio
 } // namespace boost
