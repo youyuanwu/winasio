@@ -115,6 +115,7 @@ private:
   net::dynamic_vector_buffer<CHAR, std::allocator<CHAR>> dynamic_body_buff_;
 };
 
+// Do not use this in prod since printing is expensive.
 inline std::ostream &operator<<(std::ostream &os, simple_request const &m) {
 
   PHTTP_REQUEST req = m.get_request();
@@ -140,11 +141,11 @@ public:
       : resp_(), data_chunks_(), reason_(), body_(), known_headers_(),
         unknown_headers_() {}
 
-  inline void set_reason(const std::string &reason) { reason_ = reason; }
+  inline void set_reason(std::string reason) { reason_ = std::move(reason); }
 
-  inline void set_content_type(const std::string &content_type) {
+  inline void set_content_type(std::string content_type) {
     // content_type_ = content_type;
-    this->add_known_header(HttpHeaderContentType, content_type);
+    this->add_known_header(HttpHeaderContentType, std::move(content_type));
   }
 
   inline void set_status_code(USHORT status_code) {
@@ -152,18 +153,18 @@ public:
   }
 
   // use std::move to move body into response if needed.
-  inline void set_body(std::string body) { body_ = body; }
+  inline void set_body(std::string body) { body_ = std::move(body); }
 
   inline void add_known_header(HTTP_HEADER_ID id, std::string data) {
-    this->known_headers_[id] = data;
+    this->known_headers_[id] = std::move(data);
   }
 
   inline void add_unknown_header(std::string name, std::string val) {
-    this->unknown_headers_[name] = val;
+    this->unknown_headers_[std::move(name)] = std::move(val);
   }
 
   inline void add_trailer(std::string name, std::string val) {
-    this->trailers_[name] = val;
+    this->trailers_[std::move(name)] = std::move(val);
   }
 
   inline PHTTP_RESPONSE get_response() {
