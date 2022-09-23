@@ -20,30 +20,35 @@
 #include <http.h>
 #pragma comment(lib, "httpapi.lib")
 
-namespace boost {
-namespace winasio {
-namespace http {
+namespace boost
+{
+    namespace winasio
+    {
+        namespace http
+        {
 
-// open the queue handle
-// caller takes ownership
-// Note if the request address is not on stack then the request is not routed to
-// the server.
-inline HANDLE open_raw_http_queue() {
-  HANDLE hReqQueue;
-  DWORD retCode = HttpCreateHttpHandle(&hReqQueue, // Req Queue
-                                       0           // Reserved
-  );
-  BOOST_ASSERT(retCode == NO_ERROR);
-  return hReqQueue;
-}
+            // open the queue handle
+            // caller takes ownership
+            // Note if the request address is not on stack then the request is not routed to
+            // the server.
+            inline HANDLE open_raw_http_queue()
+            {
+                HANDLE hReqQueue;
+                DWORD retCode = HttpCreateHttpHandle(&hReqQueue, // Req Queue
+                                                     0           // Reserved
+                );
+                BOOST_ASSERT(retCode == NO_ERROR);
+                return hReqQueue;
+            }
 
-using queue = basic_http_queue_handle<net::any_io_executor>;
-using controller = basic_http_controller<net::any_io_executor>;
-namespace v1 {
-using url = basic_http_url<net::any_io_executor>;
-} // namespace v1
-} // namespace http
-} // namespace winasio
+            using queue = basic_http_queue_handle<net::any_io_executor>;
+            using controller = basic_http_controller<net::any_io_executor>;
+            namespace v1
+            {
+                using url = basic_http_url<net::any_io_executor>;
+            } // namespace v1
+        } // namespace http
+    } // namespace winasio
 } // namespace boost
 
 #endif // BOOST_WINASIO_HTTP_HPP

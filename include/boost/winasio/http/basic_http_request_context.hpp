@@ -5,18 +5,22 @@
 #pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-namespace boost {
-namespace winasio {
-namespace http {
+namespace boost
+{
+    namespace winasio
+    {
+        namespace http
+        {
 
-template <typename RequestT, typename ResponseT>
-struct basic_http_request_context {
+            template <typename RequestT, typename ResponseT>
+            struct basic_http_request_context
+            {
 
-  const RequestT request;
-  ResponseT response;
-};
-} // namespace http
-} // namespace winasio
+                const RequestT request;
+                ResponseT response;
+            };
+        } // namespace http
+    } // namespace winasio
 } // namespace boost
 
 #endif // BOOST_WINASIO_HTTP_REQUEST_CONTEXT_HPP
