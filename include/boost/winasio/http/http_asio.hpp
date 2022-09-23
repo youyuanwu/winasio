@@ -103,8 +103,10 @@ class async_receive_body_op : boost::asio::coroutine {
 public:
   typedef Executor executor_type;
   async_receive_body_op(basic_http_queue_handle<executor_type> &h,
-                        HTTP_REQUEST_ID id, DynamicBuffer &buff)
-      : h_(h), id_(id), buff_(buff), state_(state::idle) {}
+                        HTTP_REQUEST_ID id, DynamicBuffer &buff,
+                        std::size_t body_size_hint)
+      : h_(h), id_(id), buff_(buff), state_(state::idle),
+        body_size_hint_(body_size_hint) {}
 
   template <typename Self>
   void operator()(Self &self, boost::system::error_code ec = {},
@@ -115,8 +117,9 @@ public:
         self.complete(ec, len);
       } else {
         state_ = state::recieving;
-        // initial prepare 10 bytes
-        this->recieve_body(self, 10);
+        // start recieve with 10 bytes.
+        // we anyway need to call recieve again to get handle eof.
+        this->recieve_body(self, body_size_hint_);
       }
       break;
     case state::recieving:
@@ -132,7 +135,17 @@ public:
       } else {
         // no error, need to call recieve again. still in recieving state.
         buff_.commit(len);
-        this->recieve_body(self, 10);
+        BOOST_LOG_TRIVIAL(debug) << "recieved len " << len;
+        if (len < body_size_hint_) {
+          // We use HTTP_RECEIVE_REQUEST_ENTITY_BODY_FLAG_FILL_BUFFER mode.
+          // if buffer is not filled. Means that request body is small and
+          // already handled by previous buffer. The next call should be EOF, so
+          // we use a tiny buffer to avoid allocation. dynamic buffer should not
+          // be resized.
+          this->recieve_body(self, 1);
+        } else {
+          this->recieve_body(self, body_size_hint_);
+        }
       }
       break;
     }
@@ -143,15 +156,17 @@ private:
   basic_http_queue_handle<executor_type> &h_;
   HTTP_REQUEST_ID id_;
   DynamicBuffer &buff_;
+  std::size_t body_size_hint_;
   enum class state { idle, recieving } state_;
 
   // helper to initiate receive.
   template <typename Self> void recieve_body(Self &self, std::size_t len) {
     auto mutbuff = buff_.prepare(len);
-    h_.async_recieve_body(id_,
-                          0, // flag
-                          (PVOID)mutbuff.data(),
-                          static_cast<ULONG>(mutbuff.size()), std::move(self));
+    h_.async_recieve_body(
+        id_,
+        HTTP_RECEIVE_REQUEST_ENTITY_BODY_FLAG_FILL_BUFFER, // flag
+        (PVOID)mutbuff.data(), static_cast<ULONG>(mutbuff.size()),
+        std::move(self));
   }
 };
 
@@ -171,17 +186,20 @@ auto async_receive(basic_http_queue_handle<Executor> &h, DynamicBuffer &buffer,
 }
 
 // async recieve body
+// body_size_hint is to instruct http api to read body size at a time.
+// ideally this size hint should be just enough to read body in one call.
 template <typename Executor, typename DynamicBuffer,
           BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
                                                std::size_t))
               Token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(Executor)>
 auto async_receive_body(basic_http_queue_handle<Executor> &h,
                         HTTP_REQUEST_ID id, DynamicBuffer &buffer,
-                        Token &&token) {
+                        Token &&token, std::size_t body_size_hint = 128) {
 
   return boost::asio::async_compose<Token, void(boost::system::error_code,
                                                 std::size_t)>(
-      details::async_receive_body_op<Executor, DynamicBuffer>(h, id, buffer),
+      details::async_receive_body_op<Executor, DynamicBuffer>(h, id, buffer,
+                                                              body_size_hint),
       token, h);
 }
 

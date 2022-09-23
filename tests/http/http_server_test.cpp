@@ -88,6 +88,8 @@ void http_server_test_helper() {
 
   test_request req;
   test_response resp;
+  req.verb_ = http::verb::post;
+  req.set_body("myRequestBody");
   req.add_header("myheader", "myval");
   // make client call
   ec = make_test_request(req, resp);

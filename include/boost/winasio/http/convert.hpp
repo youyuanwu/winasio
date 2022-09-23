@@ -24,16 +24,28 @@ get_known_headers_all(PHTTP_REQUEST req,
   }
 }
 
-// query a paticular known header.
-// return true if found
-inline bool query_known_header(PHTTP_REQUEST req, HTTP_HEADER_ID id,
-                               std::string &val) {
+// get a view of header. view is invalidated when request is destructed.
+inline bool query_known_header_string_view(PHTTP_REQUEST req, HTTP_HEADER_ID id,
+                                           std::string_view &val) {
   PHTTP_KNOWN_HEADER known_headers = req->Headers.KnownHeaders;
   HTTP_KNOWN_HEADER &header = known_headers[id];
   if (header.RawValueLength == 0) {
     return false;
   }
-  val = std::string(header.pRawValue, header.pRawValue + header.RawValueLength);
+  val = std::string_view(header.pRawValue, header.RawValueLength);
+  return true;
+}
+
+// query a paticular known header.
+// return true if found
+inline bool query_known_header(PHTTP_REQUEST req, HTTP_HEADER_ID id,
+                               std::string &val) {
+  std::string_view view;
+  bool ok = query_known_header_string_view(req, id, view);
+  if (!ok) {
+    return false;
+  }
+  val = std::string(view.data(), view.size());
   return true;
 }
 
@@ -85,6 +97,16 @@ public:
     return std::string((BYTE *)view, (BYTE *)view + size);
   }
 
+  // get the body string view without copying.
+  // Note that after simple request destructs, string view is
+  // no longer valied
+  inline std::string_view get_body_string_veiw() const {
+    auto body = dynamic_body_buff_.data();
+    auto view = body.data();
+    auto size = body.size();
+    return std::string_view((char *)view, size);
+  }
+
 private:
   std::vector<CHAR> request_buffer_; // buffer that backs request
   net::dynamic_vector_buffer<CHAR, std::allocator<CHAR>>
@@ -93,6 +115,7 @@ private:
   net::dynamic_vector_buffer<CHAR, std::allocator<CHAR>> dynamic_body_buff_;
 };
 
+// Do not use this in prod since printing is expensive.
 inline std::ostream &operator<<(std::ostream &os, simple_request const &m) {
 
   PHTTP_REQUEST req = m.get_request();
@@ -108,7 +131,7 @@ inline std::ostream &operator<<(std::ostream &os, simple_request const &m) {
   for (auto const &x : unknown_headers) {
     os << x.first << " " << x.second << "\n";
   }
-  os << m.get_body_string() << "\n";
+  os << m.get_body_string_veiw() << "\n";
   return os;
 }
 
@@ -118,29 +141,30 @@ public:
       : resp_(), data_chunks_(), reason_(), body_(), known_headers_(),
         unknown_headers_() {}
 
-  inline void set_reason(const std::string &reason) { reason_ = reason; }
+  inline void set_reason(std::string reason) { reason_ = std::move(reason); }
 
-  inline void set_content_type(const std::string &content_type) {
+  inline void set_content_type(std::string content_type) {
     // content_type_ = content_type;
-    this->add_known_header(HttpHeaderContentType, content_type);
+    this->add_known_header(HttpHeaderContentType, std::move(content_type));
   }
 
   inline void set_status_code(USHORT status_code) {
     status_code_ = status_code;
   }
 
-  inline void set_body(const std::string &body) { body_ = body; }
+  // use std::move to move body into response if needed.
+  inline void set_body(std::string body) { body_ = std::move(body); }
 
   inline void add_known_header(HTTP_HEADER_ID id, std::string data) {
-    this->known_headers_[id] = data;
+    this->known_headers_[id] = std::move(data);
   }
 
   inline void add_unknown_header(std::string name, std::string val) {
-    this->unknown_headers_[name] = val;
+    this->unknown_headers_[std::move(name)] = std::move(val);
   }
 
   inline void add_trailer(std::string name, std::string val) {
-    this->trailers_[name] = val;
+    this->trailers_[std::move(name)] = std::move(val);
   }
 
   inline PHTTP_RESPONSE get_response() {

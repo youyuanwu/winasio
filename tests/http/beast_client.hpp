@@ -23,6 +23,7 @@ public:
   inline void set_body(std::string body) { body_ = body; }
 
   // private:
+  http::verb verb_ = http::verb::get;
   std::map<std::string, std::string> headers_;
   std::string body_;
 };
@@ -51,10 +52,12 @@ inline boost::system::error_code make_test_request(test_request const &request,
   // Make the connection on the IP address we get from a lookup
   stream.connect(results);
 
-  // Set up an HTTP GET request message
-  http::request<http::string_body> req{http::verb::get, "/winhttpapitest", 11};
+  // Set up an HTTP request message
+  http::request<http::string_body> req{request.verb_, "/winhttpapitest", 11};
   req.set(http::field::host, "localhost");
   req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+  req.body() = request.body_;
+  req.prepare_payload();
 
   // Set custom header
   for (auto &kv : request.headers_) {
