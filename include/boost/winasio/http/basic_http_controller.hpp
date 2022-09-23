@@ -34,8 +34,9 @@ public:
   basic_http_controller(basic_http_queue_handle<Executor> &queue,
                         const std::wstring &url_base)
       : queue_(queue), base_url_(format_url_base(url_base)) {
-    boost::system::error_code ec;
-    queue_.add_url(url_base, ec);
+    //    TODO: need to use http_url_handler to add/remove url
+    //    boost::system::error_code ec;
+    //    queue_.add_url(url_base, ec);
   }
 
   template <typename Handler>

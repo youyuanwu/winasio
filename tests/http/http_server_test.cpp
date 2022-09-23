@@ -34,10 +34,11 @@ void log_init() {
                                    logging::trivial::debug);
 }
 
-TEST(HTTPServer, server) {
+template <winnet::http::HTTP_MAJOR_VERSION http_version>
+void http_server_test_helper() {
   log_init();
   // init http module
-  winnet::http::http_initializer init;
+  winnet::http::http_initializer<http_version> init;
   // add https then this becomes https server
   std::wstring url = L"http://localhost:12356/winhttpapitest/";
 
@@ -47,8 +48,10 @@ TEST(HTTPServer, server) {
   // open queue handle
   winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
-  queue.assign(winnet::http::open_raw_http_queue());
-  winnet::http::basic_http_url simple_url(queue, url);
+  queue.assign(init.create_http_queue(ec));
+  ASSERT_FALSE(ec.failed());
+  winnet::http::basic_http_url<net::io_context::executor_type, http_version>
+      simple_url(queue, url);
 
   auto handler = [](const winnet::http::simple_request &request,
                     winnet::http::simple_response &response) {
@@ -102,9 +105,18 @@ TEST(HTTPServer, server) {
   }
 }
 
-TEST(HTTPServer, server_shutsdown_gracefully) {
+TEST(HTTPServer, server_http_ver_1) {
+  http_server_test_helper<winnet::http::HTTP_MAJOR_VERSION::http_ver_1>();
+}
+
+TEST(HTTPServer, server_http_ver_2) {
+  http_server_test_helper<winnet::http::HTTP_MAJOR_VERSION::http_ver_2>();
+}
+
+template <winnet::http::HTTP_MAJOR_VERSION http_version>
+void server_gracefully_shutdown_helper() {
   // init http module
-  winnet::http::http_initializer init;
+  winnet::http::http_initializer<http_version> init;
   // add https then this becomes https server
   std::wstring url = L"http://localhost:12356/winhttpapitest/";
 
@@ -114,8 +126,10 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   // open queue handle
   winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
-  queue.assign(winnet::http::open_raw_http_queue());
-  winnet::http::basic_http_url simple_url(queue, url);
+  queue.assign(init.create_http_queue(ec));
+  ASSERT_FALSE(ec.failed());
+  winnet::http::basic_http_url<net::io_context::executor_type, http_version>
+      simple_url(queue, url);
 
   winnet::http::simple_request rq;
   boost::system::error_code cncl_ec;
@@ -136,9 +150,20 @@ TEST(HTTPServer, server_shutsdown_gracefully) {
   ASSERT_TRUE(cncl_ec.value() == 995); // cancelled.
 }
 
+TEST(HTTPServer, gracefully_shutdown_http_ver_1) {
+  server_gracefully_shutdown_helper<
+      winnet::http::HTTP_MAJOR_VERSION::http_ver_1>();
+}
+
+TEST(HTTPServer, gracefully_shutdown_http_ver_2) {
+  server_gracefully_shutdown_helper<
+      winnet::http::HTTP_MAJOR_VERSION::http_ver_2>();
+}
+
 TEST(HTTPServer, server_url_register_api) {
   // init http module
-  winnet::http::http_initializer init;
+  winnet::http::http_initializer<winnet::http::HTTP_MAJOR_VERSION::http_ver_1>
+      init;
 
   boost::system::error_code ec;
   net::io_context ctx;

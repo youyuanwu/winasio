@@ -73,25 +73,6 @@ public:
     return *this;
   }
 
-  void add_url(std::wstring const &url, boost::system::error_code &ec) {
-    DWORD retCode = HttpAddUrl(this->native_handle(), // Req Queue
-                               url.c_str(),           // Fully qualified URL
-                               NULL                   // Reserved
-    );
-    // std::wcout << L"added url " << url << std::endl;
-    ec = boost::system::error_code(retCode,
-                                   boost::asio::error::get_system_category());
-  }
-
-  void remove_url(std::wstring const &url, boost::system::error_code &ec) {
-    DWORD retCode = HttpRemoveUrl(this->native_handle(), // Req Queue
-                                  url.c_str()            // Fully qualified URL
-    );
-    // std::wcout << L"removed url " << url << std::endl;
-    ec = boost::system::error_code(retCode,
-                                   boost::asio::error::get_system_category());
-  }
-
   template <BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
                                                  std::size_t)) ReadHandler
                 BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
