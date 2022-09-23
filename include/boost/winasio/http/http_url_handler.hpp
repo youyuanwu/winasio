@@ -15,38 +15,39 @@ namespace boost {
 namespace winasio {
 namespace http {
 
-template <HTTP_MAJOR_VERSION> class url_handler {};
+template <typename Executor, HTTP_MAJOR_VERSION> class url_handler {};
 
-template <> class url_handler<HTTP_MAJOR_VERSION::http_ver_1> {
+template <typename Executor>
+class url_handler<Executor, HTTP_MAJOR_VERSION::http_ver_1> {
 public:
-  url_handler(HANDLE queue_handler) : queue_handler_(queue_handler) {}
+  url_handler(basic_http_queue_handle<Executor> &queue_handle)
+      : queue_handle_(queue_handle) {}
   void add_url(std::wstring const &url, system::error_code &ec) {
-    DWORD retCode = HttpAddUrl(queue_handler_, // Req Queue
-                               url.c_str(),    // Fully qualified URL
-                               NULL            // Reserved
+    DWORD retCode = HttpAddUrl(queue_handle_.native_handle(), // Req Queue
+                               url.c_str(), // Fully qualified URL
+                               NULL         // Reserved
     );
     // std::wcout << L"added url " << url << std::endl;
     ec = system::error_code(retCode, asio::error::get_system_category());
   }
 
   void remove_url(std::wstring const &url, system::error_code &ec) {
-    DWORD retCode = HttpRemoveUrl(queue_handler_, // Req Queue
-                                  url.c_str()     // Fully qualified URL
+    DWORD retCode = HttpRemoveUrl(queue_handle_.native_handle(), // Req Queue
+                                  url.c_str() // Fully qualified URL
     );
     // std::wcout << L"removed url " << url << std::endl;
     ec = system::error_code(retCode, asio::error::get_system_category());
   }
-  void set_queue_handler(HANDLE queue_handler, system::error_code &ec) {
-    queue_handler_ = queue_handler;
-  }
 
 private:
-  HANDLE queue_handler_ = nullptr;
+  basic_http_queue_handle<Executor> &queue_handle_;
 };
 
-template <> class url_handler<HTTP_MAJOR_VERSION::http_ver_2> {
+template <typename Executor>
+class url_handler<Executor, HTTP_MAJOR_VERSION::http_ver_2> {
 public:
-  url_handler(HANDLE queue_handler) : queue_handler_(queue_handler) {
+  url_handler(basic_http_queue_handle<Executor> &queue_handle)
+      : queue_handle_(queue_handle) {
     DWORD retCode = HttpCreateServerSession(HTTPAPI_VERSION_2, &session_id_, 0);
     if (retCode != NO_ERROR) {
       BOOST_LOG_TRIVIAL(error) << L"Failed to create session, err: " << retCode;
@@ -61,7 +62,7 @@ public:
     BOOST_LOG_TRIVIAL(debug) << L"Successfully create url_session:"
                              << session_id_ << ", url_group:" << group_id_;
     HTTP_BINDING_INFO binding_info{};
-    binding_info.RequestQueueHandle = queue_handler_;
+    binding_info.RequestQueueHandle = queue_handle_.native_handle();
     binding_info.Flags.Present = 1;
     retCode = HttpSetUrlGroupProperty(group_id_, HttpServerBindingProperty,
                                       &binding_info, sizeof(binding_info));
@@ -69,13 +70,17 @@ public:
       BOOST_LOG_TRIVIAL(error)
           << L"Failed to bind to request queue, err:" << retCode;
     }
+    BOOST_ASSERT(retCode == NO_ERROR);
   }
   ~url_handler() {
+    DWORD retCode = NO_ERROR;
     if (group_id_) {
-      HttpCloseUrlGroup(group_id_);
+      retCode = HttpCloseUrlGroup(group_id_);
+      BOOST_ASSERT(retCode == NO_ERROR);
     }
     if (session_id_) {
-      HttpCloseServerSession(session_id_);
+      retCode = HttpCloseServerSession(session_id_);
+      BOOST_ASSERT(retCode == NO_ERROR);
     }
   }
   void add_url(std::wstring const &url, system::error_code &ec) {
@@ -102,7 +107,7 @@ public:
 private:
   HTTP_SERVER_SESSION_ID session_id_ = 0;
   HTTP_URL_GROUP_ID group_id_ = 0;
-  HANDLE queue_handler_ = nullptr;
+  basic_http_queue_handle<Executor> &queue_handle_;
 };
 
 } // namespace http

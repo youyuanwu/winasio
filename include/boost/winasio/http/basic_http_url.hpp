@@ -19,8 +19,7 @@ public:
   typedef Executor executor_type;
   basic_http_url(basic_http_queue_handle<executor_type> &queue_handle,
                  const std::wstring &url)
-      : queue_handle_(queue_handle), url_(url),
-        url_handler_(queue_handle_.native_handle()) {
+      : queue_handle_(queue_handle), url_(url), url_handler_(queue_handle_) {
     boost::system::error_code ec;
     url_handler_.add_url(url_, ec);
     BOOST_ASSERT(!ec.failed());
@@ -41,7 +40,7 @@ public:
 private:
   basic_http_queue_handle<executor_type> &queue_handle_;
   std::wstring url_;
-  url_handler<Http_Ver> url_handler_;
+  url_handler<Executor, Http_Ver> url_handler_;
 };
 
 } // namespace http
