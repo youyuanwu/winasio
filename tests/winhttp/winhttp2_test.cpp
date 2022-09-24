@@ -4,6 +4,8 @@
 
 #include "boost/winasio/winhttp/client.hpp"
 
+#include <boost/log/trivial.hpp>
+
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
 

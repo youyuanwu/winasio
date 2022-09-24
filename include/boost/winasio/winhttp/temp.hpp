@@ -1,5 +1,7 @@
 #pragma once
 
+// This is abandoned code and should not be used
+
 // temporary implementations.
 namespace boost {
 namespace winasio {
@@ -23,8 +25,9 @@ public:
 
     boost::system::error_code ec;
     // Set the memo to indicate a closed handle.
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "Cleanup";
-
+#endif
     // ignore error code
     this->h_request.set_status_callback(NULL, ec);
     ec.clear();

@@ -89,7 +89,9 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_ASSERT(dwStatusInformationLength == sizeof(DWORD));
     DWORD data_len = *((LPDWORD)lpvStatusInformation);
 
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << L"DATA_AVAILABLE " << data_len;
+#endif
 
     // call back needs to finish request if len is 0
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::data_available);
@@ -98,8 +100,10 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
   case WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE:
     // The response header has been received and is available with
     // WinHttpQueryHeaders. The lpvStatusInformation parameter is NULL.
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug)
         << L"HEADERS_AVAILABLE " << dwStatusInformationLength;
+#endif
     // Begin downloading the resource.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::headers_available);
     cpContext->on_headers_available.complete(ec, 0);
@@ -113,17 +117,19 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     // WINHTTP_WEB_SOCKET_STATUS structure, 	and the
     // dwStatusInformationLength
     // parameter indicates the size of lpvStatusInformation.
-
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug)
         << "READ_COMPLETE Number of bytes read" << dwStatusInformationLength;
+#endif
     // Copy the data and delete the buffers.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::read_complete);
     cpContext->on_read_complete.complete(ec, dwStatusInformationLength);
     break;
   case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE:
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug)
         << L"SENDREQUEST_COMPLETE " << dwStatusInformationLength;
-
+#endif
     // Prepare the request handle to receive a response.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::send_request);
     cpContext->on_send_request_complete.complete(ec, 0);
@@ -132,13 +138,17 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     WINHTTP_ASYNC_RESULT *pAR = (WINHTTP_ASYNC_RESULT *)lpvStatusInformation;
     std::wstring err;
     winnet::winhttp::error::get_api_error_str(pAR, err);
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "winhttp callback error: " << err;
+#endif
     ec.assign(pAR->dwError, boost::asio::error::get_system_category());
     // TODO: invoke handler
   } break;
   default:
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << L"Unknown/unhandled callback - status "
                              << dwInternetStatus << L"given";
+#endif
     break;
   }
 }
@@ -300,7 +310,9 @@ public:
         state_ = state::query_data;
         h_request_.async_query_data_available(std::move(self));
       } else {
+#ifdef WINASIO_LOG
         BOOST_LOG_TRIVIAL(debug) << L"state::read_data complete";
+#endif
         state_ = state::done;
         self.complete(ec, 0); // TODO total len;
       }

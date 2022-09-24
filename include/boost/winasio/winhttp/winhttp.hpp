@@ -4,7 +4,10 @@
 #include <boost/asio/windows/basic_object_handle.hpp>
 
 #include "boost/assert.hpp"
+
+#ifdef WINASIO_LOG
 #include <boost/log/trivial.hpp>
+#endif
 
 #include "winhttp.h"
 
@@ -128,7 +131,9 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpSetStatusCallback: status: " << ec;
+#endif
     return prevCallback;
   }
 
@@ -149,7 +154,9 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpSetOption: status: " << ec;
+#endif
   }
 
   executor_type get_executor() { return ex_; }
@@ -189,7 +196,9 @@ public:
     } else {
       parent_type::assign(hSession);
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpOpen: status: " << ec;
+#endif
   }
 
   // most basic open
@@ -232,9 +241,11 @@ public:
     } else {
       parent_type::assign(hConnect);
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug)
         << "WinHttpConnect: "
         << "URL=" << url << " port=" << port << "status: " << ec;
+#endif
   }
 };
 
@@ -272,7 +283,9 @@ public:
     } else {
       parent_type::assign(hRequest);
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpOpenRequest: status: " << ec;
+#endif
   }
 
   void open(HINTERNET hConnect, LPCWSTR method, LPCWSTR path,
@@ -295,7 +308,9 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpSendRequest: status: " << ec;
+#endif
   }
 
   void query_headers(_In_ DWORD dwInfoLevel, _In_opt_ LPCWSTR pwszName,
@@ -309,7 +324,9 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpQueryHeaders: status: " << ec;
+#endif
   }
 
   // callback case WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE
@@ -321,7 +338,9 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpQueryDataAvailable: status: " << ec;
+#endif
   }
 
   // callback case: WINHTTP_CALLBACK_STATUS_READ_COMPLETE
@@ -334,9 +353,11 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug)
         << "WinHttpReadData: "
         << "ToRead=" << dwNumberOfBytesToRead << " status: " << ec;
+#endif
   }
 
   // call back case: WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE
@@ -346,7 +367,9 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpReceiveResponse: status: " << ec;
+#endif
   }
 
   void add_headers(_In_ LPCWSTR lpszHeaders, _In_ DWORD dwHeadersLength,
@@ -359,7 +382,9 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << "WinHttpAddRequestHeaders: status: " << ec;
+#endif
   }
 };
 
