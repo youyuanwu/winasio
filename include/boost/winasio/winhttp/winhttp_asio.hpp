@@ -142,13 +142,35 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_LOG_TRIVIAL(debug) << "winhttp callback error: " << err;
 #endif
     ec.assign(pAR->dwError, boost::asio::error::get_system_category());
-    // TODO: invoke handler
+    BOOST_ASSERT(ec.failed()); // ec must be failed.
+    switch (cpContext->get_state()) {
+    case ctx_state_type::data_available:
+      BOOST_ASSERT(pAR->dwResult == API_QUERY_DATA_AVAILABLE);
+      cpContext->on_data_available.complete(ec, 0);
+    case ctx_state_type::headers_available:
+      BOOST_ASSERT(pAR->dwResult == API_RECEIVE_RESPONSE);
+      cpContext->on_headers_available.complete(ec, 0);
+    case ctx_state_type::read_complete:
+      BOOST_ASSERT(pAR->dwResult == API_READ_DATA);
+      cpContext->on_read_complete.complete(ec, 0);
+    case ctx_state_type::send_request:
+      BOOST_ASSERT(pAR->dwResult == API_SEND_REQUEST);
+      cpContext->on_send_request_complete.complete(ec, 0);
+    default:
+      // TODO: WinHttpWriteData is not used yet.
+      // API_GET_PROXY_FOR_URL is not used.
+#ifdef WINASIO_LOG
+      BOOST_LOG_TRIVIAL(debug)
+          << "winhttp callback error unknown state num: " << pAR->dwResult;
+#endif
+    }
   } break;
   default:
 #ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug) << L"Unknown/unhandled callback - status "
                              << dwInternetStatus << L"given";
 #endif
+    BOOST_ASSERT_MSG(false, "dwInternetStatus unknown.");
     break;
   }
 }
