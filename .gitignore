@@ -3,5 +3,8 @@ bin
 .vs
 .vscode
 
+*.xml
+*.log
+
 #vs project for headers.
 winasio.http

@@ -163,6 +163,8 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
       BOOST_LOG_TRIVIAL(debug)
           << "winhttp callback error unknown state num: " << pAR->dwResult;
 #endif
+      BOOST_ASSERT_MSG(false, "Unknown error winhttp callback error state" +
+                                  pAR->dwResult);
     }
   } break;
   default:

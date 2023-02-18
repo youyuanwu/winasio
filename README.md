@@ -1,6 +1,8 @@
 # winasio
 
 Windows extension for boost-asio. Header only. Alpha, WIP.
+![ci](https://github.com/youyuanwu/winasio/actions/workflows/build.yaml/badge.svg)
+[![codecov](https://codecov.io/gh/youyuanwu/winasio/branch/main/graph/badge.svg?token=O5ZTZ03DAN)](https://codecov.io/gh/youyuanwu/winasio)
 
 # Compenents
 ## NamedPipe ASIO Server and Client
