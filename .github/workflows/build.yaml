@@ -20,7 +20,7 @@ jobs:
       uses: lukka/get-cmake@v3.21.2
     
     - name: Get Boost
-      uses: MarkusJx/install-boost@v2.3.0
+      uses: MarkusJx/install-boost@v2.4.1
       id: install-boost
       with:
         # REQUIRED: Specify the required boost version

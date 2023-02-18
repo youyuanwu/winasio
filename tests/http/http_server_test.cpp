@@ -1,7 +1,8 @@
+#define BOOST_TEST_MODULE http_server
+#include <boost/test/unit_test.hpp>
+
 #include <boost/winasio/http/http.hpp>
 #include <boost/winasio/http/temp.hpp>
-
-#include "gtest/gtest.h"
 
 #include "beast_client.hpp"
 
@@ -49,7 +50,7 @@ void http_server_test_helper() {
   winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(init.create_http_queue(ec));
-  ASSERT_FALSE(ec.failed());
+  BOOST_REQUIRE(!ec.failed());
   winnet::http::basic_http_url<net::io_context::executor_type, http_version>
       simple_url(queue, url);
 
@@ -93,8 +94,8 @@ void http_server_test_helper() {
   req.add_header("myheader", "myval");
   // make client call
   ec = make_test_request(req, resp);
-  ASSERT_FALSE(ec.failed());
-  ASSERT_EQ(resp.status, http::status::ok);
+  BOOST_REQUIRE(!ec.failed());
+  BOOST_REQUIRE_EQUAL(resp.status, http::status::ok);
 
   // let server listen again
   std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -107,11 +108,13 @@ void http_server_test_helper() {
   }
 }
 
-TEST(HTTPServer, server_http_ver_1) {
+BOOST_AUTO_TEST_SUITE(test_http_server)
+
+BOOST_AUTO_TEST_CASE(server_http_ver_1) {
   http_server_test_helper<winnet::http::HTTP_MAJOR_VERSION::http_ver_1>();
 }
 
-TEST(HTTPServer, server_http_ver_2) {
+BOOST_AUTO_TEST_CASE(server_http_ver_2) {
   http_server_test_helper<winnet::http::HTTP_MAJOR_VERSION::http_ver_2>();
 }
 
@@ -129,7 +132,7 @@ void server_gracefully_shutdown_helper() {
   winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(init.create_http_queue(ec));
-  ASSERT_FALSE(ec.failed());
+  BOOST_REQUIRE(!ec.failed());
   winnet::http::basic_http_url<net::io_context::executor_type, http_version>
       simple_url(queue, url);
 
@@ -149,20 +152,20 @@ void server_gracefully_shutdown_helper() {
 
   t.join();
 
-  ASSERT_TRUE(cncl_ec.value() == 995); // cancelled.
+  BOOST_REQUIRE_EQUAL(cncl_ec.value(), 995); // cancelled.
 }
 
-TEST(HTTPServer, gracefully_shutdown_http_ver_1) {
+BOOST_AUTO_TEST_CASE(gracefully_shutdown_http_ver_1) {
   server_gracefully_shutdown_helper<
       winnet::http::HTTP_MAJOR_VERSION::http_ver_1>();
 }
 
-TEST(HTTPServer, gracefully_shutdown_http_ver_2) {
+BOOST_AUTO_TEST_CASE(gracefully_shutdown_http_ver_2) {
   server_gracefully_shutdown_helper<
       winnet::http::HTTP_MAJOR_VERSION::http_ver_2>();
 }
 
-TEST(HTTPServer, server_url_register_api) {
+BOOST_AUTO_TEST_CASE(server_url_register_api) {
   // init http module
   winnet::http::http_initializer<winnet::http::HTTP_MAJOR_VERSION::http_ver_1>
       init;
@@ -202,3 +205,5 @@ TEST(HTTPServer, server_url_register_api) {
   controller.start();
   // ctx.run();
 }
+
+BOOST_AUTO_TEST_SUITE_END()

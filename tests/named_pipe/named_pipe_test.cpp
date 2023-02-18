@@ -1,6 +1,8 @@
+#define BOOST_TEST_MODULE named_pipe
+#include <boost/test/unit_test.hpp>
+
 #include "named_pipe/echoserver_movable.hpp"
 #include "test_client.hpp"
-#include "gtest/gtest.h"
 
 #include "named_pipe/echoserver.hpp"
 
@@ -37,11 +39,9 @@ template <typename Server> void test_server() {
           std::string("myMessage") + std::to_string(n) + "hi";
       std::string replyMsg;
       boost::system::error_code ec = make_client_call(myMessage, replyMsg);
-      ASSERT_FALSE(ec.failed()) << myMessage << " failed: " << ec.message();
+      BOOST_CHECK_MESSAGE(!ec.failed(), myMessage + " failed: " + ec.message());
       if (!ec.failed()) {
-        ASSERT_EQ(myMessage, replyMsg);
-        // std::cout << (std::string("!!!!!!!!") +  myMessage + " success") <<
-        // std::endl;
+        BOOST_CHECK_EQUAL(myMessage, replyMsg);
       }
       sem.release();
     });
@@ -51,9 +51,9 @@ template <typename Server> void test_server() {
   std::string myMessage = std::string("myMessage adhoc");
   std::string replyMsg;
   boost::system::error_code ec = make_client_call(myMessage, replyMsg);
-  ASSERT_FALSE(ec.failed());
+  BOOST_CHECK(!ec.failed());
   if (!ec.failed()) {
-    ASSERT_EQ(myMessage, replyMsg);
+    BOOST_CHECK_EQUAL(myMessage, replyMsg);
   }
 
   // let 3 clients race at the same time.
@@ -76,6 +76,10 @@ template <typename Server> void test_server() {
   io_context.reset();
 }
 
-TEST(NamedPipe, movable_server) { test_server<server_movable>(); }
+BOOST_AUTO_TEST_SUITE(test_named_pipe)
 
-TEST(NamedPipe, server) { test_server<server>(); }
+BOOST_AUTO_TEST_CASE(movable_server) { test_server<server_movable>(); }
+
+BOOST_AUTO_TEST_CASE(nonmovable_server) { test_server<server>(); }
+
+BOOST_AUTO_TEST_SUITE_END()

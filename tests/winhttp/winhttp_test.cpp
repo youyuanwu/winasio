@@ -1,8 +1,10 @@
+#define BOOST_TEST_MODULE http_client
+#include <boost/test/unit_test.hpp>
+
 #include "boost/asio.hpp"
 #include "boost/winasio/winhttp/winhttp.hpp"
 // include temp impl/application of winhttp
 // #include "boost\winasio\winhttp\temp.hpp"
-#include "gtest/gtest.h"
 
 #include <iostream>
 
@@ -72,50 +74,55 @@ namespace winnet = boost::winasio;
 //   BOOST_LOG_TRIVIAL(debug) << std::string(data.begin(), data.end());
 // }
 
-TEST(HTTPClient, CrackURL) {
+BOOST_AUTO_TEST_SUITE(test_http_client)
+
+BOOST_AUTO_TEST_CASE(CrackURL) {
   boost::system::error_code ec;
   winnet::winhttp::url_component x;
   x.crack(L"https://www.google.com:12345/person?name=john", ec);
-  ASSERT_FALSE(ec.failed());
-  ASSERT_EQ(L"www.google.com", x.get_hostname());
-  ASSERT_EQ(INTERNET_SCHEME_HTTPS, x.get_nscheme());
-  ASSERT_EQ(12345, x.get_port());
-  ASSERT_EQ(L"/person", x.get_path());
-  ASSERT_EQ(L"?name=john", x.get_query());
+  BOOST_REQUIRE(!ec.failed());
+  BOOST_CHECK(std::wstring(L"www.google.com") == x.get_hostname());
+  BOOST_CHECK_EQUAL(INTERNET_SCHEME_HTTPS, x.get_nscheme());
+  BOOST_CHECK_EQUAL(12345, x.get_port());
+  BOOST_CHECK(std::wstring(L"/person") == x.get_path());
+  BOOST_CHECK(std::wstring(L"?name=john") == x.get_query());
 }
 
 // exercise for using buffer.
-TEST(HTTPClient, ASIOBuff) {
+BOOST_AUTO_TEST_CASE(ASIOBuff) {
   std::vector<BYTE> data(0);
   auto buff = net::dynamic_buffer(data);
 
-  ASSERT_EQ(0, buff.size());
+  BOOST_CHECK_EQUAL(0, buff.size());
   auto part = buff.prepare(5);
   std::size_t n = net::buffer_copy(part, net::const_buffer("hello", 5));
-  ASSERT_EQ(5, n);
-  ASSERT_EQ('h', data[0]);
-  ASSERT_EQ(5, data.size());
+  BOOST_CHECK_EQUAL(5, n);
+  BOOST_CHECK_EQUAL('h', data[0]);
+  BOOST_CHECK_EQUAL(5, data.size());
 
-  ASSERT_EQ(0, buff.size()); // not commited.
+  BOOST_CHECK_EQUAL(0, buff.size()); // not commited.
   buff.commit(n);
-  ASSERT_EQ(5, buff.size());
+  BOOST_CHECK_EQUAL(5, buff.size());
 }
 
-TEST(HTTPClient, AcceptType) {
+BOOST_AUTO_TEST_CASE(AcceptType) {
   winnet::winhttp::header::accept_types at = {L"application/json"};
   const LPCWSTR *data = at.get();
-  ASSERT_EQ(*data, std::wstring(L"application/json"));
-  ASSERT_EQ(*(data + 1), nullptr);
+  BOOST_CHECK(std::wstring(*data) == std::wstring(L"application/json"));
+  BOOST_CHECK_EQUAL(*(data + 1), nullptr);
 }
 
-TEST(HTTPClient, AdditionalHeaders) {
+BOOST_AUTO_TEST_CASE(AdditionalHeaders) {
 
   winnet::winhttp::header::headers hs;
   hs.add(L"myheader1", L"myval1").add(L"myheader2", L"myval2");
 
-  ASSERT_EQ(L"myheader1: myval1\r\nmyheader2: myval2", std::wstring(hs.get()));
+  BOOST_CHECK(std::wstring(L"myheader1: myval1\r\nmyheader2: myval2") ==
+              std::wstring(hs.get()));
 
   winnet::winhttp::header::headers hs0; // empty
-  ASSERT_EQ(nullptr, hs0.get());
-  ASSERT_EQ(0, hs0.size());
+  BOOST_CHECK_EQUAL(nullptr, hs0.get());
+  BOOST_CHECK_EQUAL(0, hs0.size());
 }
+
+BOOST_AUTO_TEST_SUITE_END()
