@@ -38,7 +38,7 @@ typedef winnet::named_pipe_protocol<net::io_context::executor_type>::pipe
     mystream;
 
 // Performs an HTTP GET and prints the response
-int main(int argc, char **argv) {
+int main() {
   try {
     // Check command line arguments.
     // if(argc != 4 && argc != 5)

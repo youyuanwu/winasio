@@ -1,6 +1,6 @@
 #include "echoserver_movable.hpp"
 
-int main(int argc, char *argv[]) {
+int main() {
   try {
     // if (argc != 2)
     // {

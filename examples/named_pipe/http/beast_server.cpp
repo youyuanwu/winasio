@@ -183,7 +183,7 @@ void http_server(myacceptor &acceptor, mysocket &socket) {
   });
 }
 
-int main(int argc, char *argv[]) {
+int main() {
   try {
     // Check command line arguments.
     // if(argc != 3)

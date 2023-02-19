@@ -61,8 +61,9 @@ public:
 
     if (hPipe == INVALID_HANDLE_VALUE) {
       DWORD last_error = ::GetLastError();
-      boost::system::error_code ec = boost::system::error_code(
-          last_error, boost::asio::error::get_system_category());
+      ec = boost::system::error_code(last_error,
+                                     boost::asio::error::get_system_category());
+      return;
     }
     parent_type::assign(hPipe);
   }

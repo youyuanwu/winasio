@@ -29,6 +29,7 @@ boost::system::error_code make_client_call(std::string const &msg,
 
   char reply[max_length];
   size_t reply_length = net::read(pipe, net::buffer(reply, msg.length()), ec);
+  DBG_UNREFERENCED_LOCAL_VARIABLE(reply_length);
   if (ec.failed()) {
     return ec;
   }

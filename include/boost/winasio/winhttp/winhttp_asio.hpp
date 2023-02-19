@@ -67,6 +67,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
                                       DWORD dwInternetStatus,
                                       LPVOID lpvStatusInformation,
                                       DWORD dwStatusInformationLength) {
+  UNREFERENCED_PARAMETER(hInternet);
   typedef asio_request_context<Executor>::state ctx_state_type;
   asio_request_context<Executor> *cpContext;
   cpContext = (asio_request_context<Executor> *)dwContext;

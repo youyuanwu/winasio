@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE(AdditionalHeaders) {
 
   winnet::winhttp::header::headers hs0; // empty
   BOOST_CHECK_EQUAL(nullptr, hs0.get());
-  BOOST_CHECK_EQUAL(0, hs0.size());
+  BOOST_CHECK_EQUAL(0u, hs0.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

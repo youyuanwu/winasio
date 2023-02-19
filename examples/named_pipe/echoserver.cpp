@@ -8,7 +8,7 @@
 
 namespace net = boost::asio;
 
-int main(int argc, char *argv[]) {
+int main() {
   try {
 
     net::io_context io_context;

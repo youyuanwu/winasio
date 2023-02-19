@@ -33,6 +33,11 @@ target_compile_definitions(winasio
     INTERFACE _WIN32_WINNT=0x0601
 )
 
+# good practice
+target_compile_options(winasio
+  INTERFACE /W4 /WX
+)
+
 # currently winasio uses boost log for logging
 target_link_libraries(winasio
     INTERFACE Boost::log Boost::disable_autolinking Boost::headers

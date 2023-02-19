@@ -9,7 +9,7 @@ namespace winnet = boost::winasio;
 
 enum { max_length = 1024 };
 
-int main(int argc, char *argv[]) {
+int main() {
   try {
     net::io_context io_context;
 

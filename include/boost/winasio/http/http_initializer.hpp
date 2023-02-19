@@ -22,6 +22,7 @@ public:
     DWORD retCode =
         HttpTerminate(HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, NULL);
     BOOST_ASSERT(retCode == NO_ERROR);
+    DBG_UNREFERENCED_LOCAL_VARIABLE(retCode);
   }
 
 private:
@@ -36,6 +37,7 @@ inline void http_initializer<HTTP_MAJOR_VERSION::http_ver_1>::do_init() {
                      nullptr // Reserved
       );
   BOOST_ASSERT(retCode == NO_ERROR);
+  DBG_UNREFERENCED_LOCAL_VARIABLE(retCode);
 }
 
 template <>
@@ -56,6 +58,7 @@ inline void http_initializer<HTTP_MAJOR_VERSION::http_ver_2>::do_init() {
       HttpInitialize(HTTPAPI_VERSION_2,
                      HTTP_INITIALIZE_SERVER | HTTP_INITIALIZE_CONFIG, nullptr);
   BOOST_ASSERT(retCode == NO_ERROR);
+  DBG_UNREFERENCED_LOCAL_VARIABLE(retCode);
 }
 
 template <>

@@ -34,6 +34,7 @@ inline HANDLE open_raw_http_queue() {
                                        0           // Reserved
   );
   BOOST_ASSERT(retCode == NO_ERROR);
+  DBG_UNREFERENCED_LOCAL_VARIABLE(retCode);
   return hReqQueue;
 }
 

@@ -3,6 +3,8 @@ file(GLOB_RECURSE ALL_SOURCE_FILES
     examples/*.hpp
     include/*.cpp
     include/*.hpp
+    src/*.cpp
+    src/*.hpp
     tests/*.cpp
     tests/*.hpp
 )

@@ -18,7 +18,7 @@ inline void client_connect(boost::system::error_code &ec, HANDLE &pipe_ret,
   HANDLE hPipe;
   BOOL fSuccess = FALSE;
   DWORD dwMode;
-  DWORD last_error;
+  DWORD last_error = {};
   // connect to pipe
   while (1) {
     hPipe = CreateFile(endpoint.c_str(), // pipe name
@@ -66,6 +66,7 @@ inline void client_connect(boost::system::error_code &ec, HANDLE &pipe_ret,
                                      NULL);   // don't set maximum time
   if (!fSuccess) {
     // printf("SetNamedPipeHandleState failed. GLE=%d\n", GetLastError());
+    last_error = ::GetLastError();
     ec =
         boost::system::error_code(last_error, boost::system::system_category());
     return;

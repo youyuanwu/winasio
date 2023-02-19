@@ -142,7 +142,7 @@ private:
     queue_.async_send_response(
         rq.response.get_response(), rq.request.get_request_id(),
         HTTP_SEND_RESPONSE_FLAG_DISCONNECT,
-        [rq](const boost::system::error_code &ec, size_t) {});
+        [rq](const boost::system::error_code &, size_t) {});
   }
 
 private:

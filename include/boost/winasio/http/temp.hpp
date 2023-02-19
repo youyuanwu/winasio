@@ -98,6 +98,7 @@ private:
     winnet::http::async_receive_body(
         queue_handle_, request_.get_request_id(), buff,
         [self](boost::system::error_code ec, std::size_t len) {
+          UNREFERENCED_PARAMETER(len);
           if (ec) {
 #ifdef WINASIO_LOG
             BOOST_LOG_TRIVIAL(debug)
