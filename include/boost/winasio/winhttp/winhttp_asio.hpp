@@ -148,15 +148,19 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     case ctx_state_type::data_available:
       BOOST_ASSERT(pAR->dwResult == API_QUERY_DATA_AVAILABLE);
       cpContext->on_data_available.complete(ec, 0);
+      break;
     case ctx_state_type::headers_available:
       BOOST_ASSERT(pAR->dwResult == API_RECEIVE_RESPONSE);
       cpContext->on_headers_available.complete(ec, 0);
+      break;
     case ctx_state_type::read_complete:
       BOOST_ASSERT(pAR->dwResult == API_READ_DATA);
       cpContext->on_read_complete.complete(ec, 0);
+      break;
     case ctx_state_type::send_request:
       BOOST_ASSERT(pAR->dwResult == API_SEND_REQUEST);
       cpContext->on_send_request_complete.complete(ec, 0);
+      break;
     default:
       // TODO: WinHttpWriteData is not used yet.
       // API_GET_PROXY_FOR_URL is not used.
