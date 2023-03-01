@@ -12,15 +12,84 @@ namespace winhttp {
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
 
-// Dev note: when those optr are reset with a token(in user thread), the
-// executor has an entry for this token and will wait for complete to be called
-// on optr(from winhttp thread). So the contract between user init/send thread
-// and winhttp callback thread are synchronized by this optr, and internally
-// should be backed by a iocp. Original implementation added a event object on
-// the h_request, and the event is created when request is sent, and executor
-// must wait for the complete signal for this event which user needs to invoke
-// when request is done. This is no longer needed and has been removed.
+// Compose operation to support coroutine
+// pass in an oh, and init by async compose, in WinHttp callback then set the
+// event, then the operation is compeleted. This is just a wrapper to support
+// coroutine return type.
+// The idea is to pass ec and len in ctx and access them here and pass to user
+// handler. The ctx in the asio_winhttp handle should out last the async
+// operations, so the pointers passed in ctor should be valid in the life time.
+//
+// The intended handler type is void (boost::system::error_code ec)
+template <typename Executor> class async_op : boost::asio::coroutine {
+public:
+  // oh needs to persist until async operation finishes.
+  async_op(net::windows::basic_object_handle<Executor> *oh,
+           boost::system::error_code *ctx_ec)
+      : oh_(oh), ctx_ec_(ctx_ec) {}
 
+  template <typename Self>
+  void operator()(Self &self, boost::system::error_code ec = {}) {
+    if (ec.failed()) {
+      // trigger user handler
+      self.complete(ec);
+      return;
+    }
+
+    oh_->async_wait(
+        [self = std::move(self), this](boost::system::error_code ec) mutable {
+          // we don't expect event can fail.
+          assert(!ec.failed());
+          DBG_UNREFERENCED_LOCAL_VARIABLE(ec);
+          // This invokes the user handler.
+          // pass the ctx_ec to the handler.
+          self.complete(*ctx_ec_);
+        });
+  }
+
+private:
+  net::windows::basic_object_handle<Executor> *oh_;
+  boost::system::error_code *ctx_ec_;
+};
+
+// differ from the above by having the len signature.
+// used to complete handler with len.
+// The intended handler type is void (boost::system::error_code ec, std::size_t
+// len)
+template <typename Executor> class async_len_op : boost::asio::coroutine {
+public:
+  // oh needs to persist until async operation finishes.
+  async_len_op(net::windows::basic_object_handle<Executor> *oh,
+               boost::system::error_code *ctx_ec, std::size_t *len)
+      : oh_(oh), ctx_ec_(ctx_ec), len_(len) {}
+
+  template <typename Self>
+  void operator()(Self &self, boost::system::error_code ec = {}) {
+    if (ec.failed()) {
+      // trigger user handler
+      self.complete(ec, 0);
+      return;
+    }
+    oh_->async_wait(
+        [self = std::move(self), this](boost::system::error_code ec) mutable {
+          assert(!ec.failed());
+          DBG_UNREFERENCED_LOCAL_VARIABLE(ec);
+          // pass the ctx_ec to the handler
+          self.complete(*ctx_ec_, *len_);
+        });
+  }
+
+private:
+  net::windows::basic_object_handle<Executor> *oh_;
+  boost::system::error_code *ctx_ec_;
+  std::size_t *len_;
+};
+
+// The hook between asio and winhttp is through a single object handle (event).
+// where user handler's are moved into the object handle, when winhttp frontend
+// api is triggered, and winhttp backend thread (callback) sets the event, so
+// that the user handler gets invoked. In each step/winhttp front end
+// invokation, the event is reset, and then reused.
 template <typename Executor> class asio_request_context {
 public:
   typedef Executor executor_type;
@@ -35,25 +104,51 @@ public:
 
   // callbacks
   asio_request_context(const executor_type &ex)
-      : ex_(ex), on_send_request_complete(), on_headers_available(),
-        on_data_available(), on_read_complete(), state_(state::idle) {}
+      : ex_(ex), step_event(ex), step_ec(), step_len(0), state_(state::idle) {
+    HANDLE ev = CreateEvent(NULL,  // default security attributes
+                            TRUE,  // manual-reset event
+                            FALSE, // initial state is nonsignaled
+                            NULL   // object name
+    );
+    assert(ev != nullptr);
+    this->step_event.assign(ev);
+  }
 
   void set_state(state s) noexcept { state_ = s; }
 
   state get_state() const noexcept { return state_; }
 
-  // need to invoke recieve response inside
-  net::windows::overlapped_ptr on_send_request_complete;
+  // completes the current step.
+  // This sets the event so that asio handler/token gets run,
+  // and ec value will be accessable in handler.
+  void step_complete(boost::system::error_code ec, std::size_t len = 0) {
+    // sets the event and remembers the error
+    HANDLE h = this->step_event.native_handle();
+    assert(h != NULL);
+    assert(h != INVALID_HANDLE_VALUE);
+    bool ok = SetEvent(h);
+    assert(ok);
+    DBG_UNREFERENCED_LOCAL_VARIABLE(ok);
+    this->step_ec = ec;
+    this->step_len = len;
+  }
 
-  // need to invoke query data inside
-  net::windows::overlapped_ptr on_headers_available;
+  // reset event and clear ec.
+  // usually used before initiate winhttp api call.
+  void step_reset() {
+    HANDLE h = this->step_event.native_handle();
+    assert(h != NULL);
+    assert(h != INVALID_HANDLE_VALUE);
+    bool ok = ResetEvent(h);
+    assert(ok);
+    DBG_UNREFERENCED_LOCAL_VARIABLE(ok);
+    step_ec.clear();
+    step_len = 0;
+  }
 
-  // need to invoke read data inside
-  // if len is 0, request ends.
-  net::windows::overlapped_ptr on_data_available;
-
-  // need to invoke query data inside
-  net::windows::overlapped_ptr on_read_complete;
+  net::windows::basic_object_handle<executor_type> step_event;
+  boost::system::error_code step_ec;
+  std::size_t step_len;
 
   executor_type get_executor() { return ex_; }
 
@@ -96,7 +191,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
 
     // call back needs to finish request if len is 0
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::data_available);
-    cpContext->on_data_available.complete(ec, data_len);
+    cpContext->step_complete(ec, data_len);
   } break;
   case WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE:
     // The response header has been received and is available with
@@ -107,7 +202,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
 #endif
     // Begin downloading the resource.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::headers_available);
-    cpContext->on_headers_available.complete(ec, 0);
+    cpContext->step_complete(ec);
     break;
   case WINHTTP_CALLBACK_STATUS_READ_COMPLETE:
     // Data was successfully read from the server. The lpvStatusInformation
@@ -124,7 +219,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
 #endif
     // Copy the data and delete the buffers.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::read_complete);
-    cpContext->on_read_complete.complete(ec, dwStatusInformationLength);
+    cpContext->step_complete(ec, dwStatusInformationLength);
     break;
   case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE:
 #ifdef WINASIO_LOG
@@ -133,7 +228,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
 #endif
     // Prepare the request handle to receive a response.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::send_request);
-    cpContext->on_send_request_complete.complete(ec, 0);
+    cpContext->step_complete(ec);
     break;
   case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
     WINHTTP_ASYNC_RESULT *pAR = (WINHTTP_ASYNC_RESULT *)lpvStatusInformation;
@@ -147,19 +242,19 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     switch (cpContext->get_state()) {
     case ctx_state_type::data_available:
       BOOST_ASSERT(pAR->dwResult == API_QUERY_DATA_AVAILABLE);
-      cpContext->on_data_available.complete(ec, 0);
+      cpContext->step_complete(ec, 0);
       break;
     case ctx_state_type::headers_available:
       BOOST_ASSERT(pAR->dwResult == API_RECEIVE_RESPONSE);
-      cpContext->on_headers_available.complete(ec, 0);
+      cpContext->step_complete(ec);
       break;
     case ctx_state_type::read_complete:
       BOOST_ASSERT(pAR->dwResult == API_READ_DATA);
-      cpContext->on_read_complete.complete(ec, 0);
+      cpContext->step_complete(ec, 0);
       break;
     case ctx_state_type::send_request:
       BOOST_ASSERT(pAR->dwResult == API_SEND_REQUEST);
-      cpContext->on_send_request_complete.complete(ec, 0);
+      cpContext->step_complete(ec);
       break;
     default:
       // TODO: WinHttpWriteData is not used yet.
@@ -234,64 +329,93 @@ public:
   // async has all the same param with sync version
   // but has handler token.
   // winttp callback case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE
-  // size_t param is not used
+  // handler signature is void(boost::system::error_code)
+  // handler should call async_recieve_response
   template <typename Handler>
-  void async_send(LPCWSTR lpszHeaders, DWORD dwHeadersLength, LPVOID lpOptional,
+  auto async_send(LPCWSTR lpszHeaders, DWORD dwHeadersLength, LPVOID lpOptional,
                   DWORD dwOptionalLength, DWORD dwTotalLength,
                   Handler &&token) {
     boost::system::error_code ec;
-    // set callback in ctx.
-    // defer to winhttp to invoke callback
-    ctx_.on_send_request_complete.reset(ctx_.get_executor(), std::move(token));
     ctx_.set_state(ctx_state_type::send_request);
+    // this is optional.
+    ctx_.step_reset();
     parent_type::send(lpszHeaders, dwHeadersLength, lpOptional,
                       dwOptionalLength, dwTotalLength, (DWORD_PTR)&ctx_, ec);
     if (ec) {
       ctx_.set_state(ctx_state_type::error);
-      ctx_.on_send_request_complete.complete(ec, 0);
+      // set the event so that the async op will complete immediately.
+      ctx_.step_complete(ec);
     }
+
+    // defer to winhttp to invoke callback
+    // callback/token is passed to a windows event/object handle in ctx
+    return boost::asio::async_compose<Handler, void(boost::system::error_code)>(
+        async_op<executor_type>(&ctx_.step_event, &ctx_.step_ec), token,
+        ctx_.step_event);
   }
 
   // callback case: WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE
-  // size_t param is not used
-  template <typename Handler> void async_recieve_response(Handler &&token) {
+  // handler signature is void(boost::system::error_code)
+  // handler should call async_query_data_available
+  template <typename Handler> auto async_recieve_response(Handler &&token) {
     boost::system::error_code ec;
     ctx_.set_state(ctx_state_type::headers_available);
-    ctx_.on_headers_available.reset(ctx_.get_executor(), std::move(token));
+
+    ctx_.step_reset();
     parent_type::receive_response(ec);
     if (ec) {
       ctx_.set_state(ctx_state_type::error);
-      ctx_.on_headers_available.complete(ec, 0);
+      ctx_.step_complete(ec);
     }
+
+    return boost::asio::async_compose<Handler, void(boost::system::error_code)>(
+        async_op<executor_type>(&ctx_.step_event, &ctx_.step_ec), token,
+        ctx_.step_event);
   }
 
   // can be invoke in async_recieve_response or ...
   // callback case : WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE
+  // handler signature is void(boost::system::error_code, std::size_t)
+  // handler should call async_read_data
+  // if callback len is 0, this means body/request has ended.
   template <typename Handler> void async_query_data_available(Handler &&token) {
     boost::system::error_code ec;
     ctx_.set_state(ctx_state_type::data_available);
-    ctx_.on_data_available.reset(ctx_.get_executor(), std::move(token));
+
+    ctx_.step_reset();
     parent_type::query_data_available(NULL, ec);
     if (ec) {
       ctx_.set_state(ctx_state_type::error);
-      ctx_.on_data_available.complete(ec, 0);
+      ctx_.step_complete(ec, 0);
     }
+    return boost::asio::async_compose<Handler, void(boost::system::error_code,
+                                                    std::size_t)>(
+        async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
+                                    &ctx_.step_len),
+        token, ctx_.step_event);
   }
 
   // callback case: WINHTTP_CALLBACK_STATUS_READ_COMPLETE
+  // handler signature is void(boost::system::error_code, std::size_t)
+  // handler should call async_query_data_available
   template <typename Handler>
   void async_read_data(_Out_ LPVOID lpBuffer, _In_ DWORD dwNumberOfBytesToRead,
                        Handler &&token) {
     boost::system::error_code ec;
     ctx_.set_state(ctx_state_type::read_complete);
-    ctx_.on_read_complete.reset(ctx_.get_executor(), std::move(token));
+    ctx_.step_reset();
     parent_type::read_data(lpBuffer, dwNumberOfBytesToRead,
                            NULL, // lpdwNumberOfBytesRead
                            ec);
     if (ec) {
       ctx_.set_state(ctx_state_type::error);
-      ctx_.on_read_complete.complete(ec, 0);
+      ctx_.step_complete(ec, 0);
     }
+    return boost::asio::async_compose<Handler, void(boost::system::error_code,
+                                                    std::size_t)>(
+        async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
+                                    &ctx_.step_len),
+        token, ctx_.step_event);
   }
 
 private:
@@ -323,10 +447,11 @@ public:
       h_request_.async_query_data_available(std::move(self));
       break;
     case state::query_data: {
-      // no more data.
+      // If query len = 0 -> no more data.
       // If do not need trailers, request done and success.
       // If need trailers, we need to call read data and it will return 0 bytes
       // read and populate trailers.
+      // here we assume we need http trailers.
       state_ = state::read_data;
       auto buff = this->buff_.prepare(len + 1); // always prepare 1 more byte.
       h_request_.async_read_data((LPVOID)buff.data(), static_cast<DWORD>(len),
