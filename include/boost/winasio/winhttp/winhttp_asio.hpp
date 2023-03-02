@@ -36,15 +36,15 @@ public:
       return;
     }
 
-    oh_->async_wait(
-        [self = std::move(self), this](boost::system::error_code ec) mutable {
-          // we don't expect event can fail.
-          assert(!ec.failed());
-          DBG_UNREFERENCED_LOCAL_VARIABLE(ec);
-          // This invokes the user handler.
-          // pass the ctx_ec to the handler.
-          self.complete(*ctx_ec_);
-        });
+    oh_->async_wait([self = std::move(self),
+                     c = ctx_ec_](boost::system::error_code ec) mutable {
+      // we don't expect event can fail.
+      assert(!ec.failed());
+      DBG_UNREFERENCED_LOCAL_VARIABLE(ec);
+      // This invokes the user handler.
+      // pass the ctx_ec to the handler.
+      self.complete(*c);
+    });
   }
 
 private:
@@ -70,13 +70,16 @@ public:
       self.complete(ec, 0);
       return;
     }
-    oh_->async_wait(
-        [self = std::move(self), this](boost::system::error_code ec) mutable {
-          assert(!ec.failed());
-          DBG_UNREFERENCED_LOCAL_VARIABLE(ec);
-          // pass the ctx_ec to the handler
-          self.complete(*ctx_ec_, *len_);
-        });
+    // len_ and ctx_ec_ are owned by request hanle where it is guaranteed to be
+    // valid when operation is going on. capture this causes problems because
+    // this can be gone when async_compose frontend finishes.
+    oh_->async_wait([self = std::move(self), l = len_,
+                     c = ctx_ec_](boost::system::error_code ec) mutable {
+      assert(!ec.failed());
+      DBG_UNREFERENCED_LOCAL_VARIABLE(ec);
+      // pass the ctx_ec and len to the handler
+      self.complete(*c, *l);
+    });
   }
 
 private:
@@ -378,7 +381,7 @@ public:
   // handler signature is void(boost::system::error_code, std::size_t)
   // handler should call async_read_data
   // if callback len is 0, this means body/request has ended.
-  template <typename Handler> void async_query_data_available(Handler &&token) {
+  template <typename Handler> auto async_query_data_available(Handler &&token) {
     boost::system::error_code ec;
     ctx_.set_state(ctx_state_type::data_available);
 
@@ -399,7 +402,7 @@ public:
   // handler signature is void(boost::system::error_code, std::size_t)
   // handler should call async_query_data_available
   template <typename Handler>
-  void async_read_data(_Out_ LPVOID lpBuffer, _In_ DWORD dwNumberOfBytesToRead,
+  auto async_read_data(_Out_ LPVOID lpBuffer, _In_ DWORD dwNumberOfBytesToRead,
                        Handler &&token) {
     boost::system::error_code ec;
     ctx_.set_state(ctx_state_type::read_complete);
