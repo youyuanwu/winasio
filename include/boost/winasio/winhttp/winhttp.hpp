@@ -360,6 +360,18 @@ public:
 #endif
   }
 
+  void write_data(_In_ LPCVOID lpBuffer, _In_ DWORD dwNumberOfBytesToWrite,
+                  _Out_ LPDWORD lpdwNumberOfBytesWritten,
+                  _Out_ boost::system::error_code &ec) {
+    bool ok =
+        WinHttpWriteData(parent_type::native_handle(), lpBuffer,
+                         dwNumberOfBytesToWrite, lpdwNumberOfBytesWritten);
+    if (!ok) {
+      ec = boost::system::error_code(GetLastError(),
+                                     boost::asio::error::get_system_category());
+    }
+  }
+
   // call back case: WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE
   void receive_response(_Out_ boost::system::error_code &ec) {
     bool ok = WinHttpReceiveResponse(parent_type::native_handle(), NULL);

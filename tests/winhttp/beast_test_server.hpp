@@ -42,10 +42,13 @@ typedef tcp::socket mysocket;
 //     mysocket;
 
 namespace my_program_state {
+std::atomic<std::size_t> count = 0;
 std::size_t request_count() {
-  static std::size_t count = 0;
+  // static std::size_t count = 0;
   return ++count;
 }
+
+void set_request_count(std::size_t x) { count = x; }
 
 std::time_t now() { return std::time(0); }
 } // namespace my_program_state
@@ -100,7 +103,9 @@ private:
       response_.set(http::field::server, "Beast");
       create_response();
       break;
-
+    case http::verb::post:
+      create_post_response();
+      break;
     default:
       // We return responses indicating an error if
       // we do not recognize the request method.
@@ -113,6 +118,63 @@ private:
     }
 
     write_response();
+  }
+
+  void create_post_response() {
+    auto f = [&]() {
+      response_.result(http::status::bad_request);
+      response_.set(http::field::content_type, "text/plain");
+      beast::ostream(response_.body()) << "post bad body\r\n";
+    };
+
+    std::string body = beast::buffers_to_string(request_.body().data());
+    if (body.empty()) {
+      f();
+      return;
+    }
+    // body should be:
+    // set_count=1
+    const std::string prefix = "set_count=";
+    if (body.size() < prefix.size() + 1) {
+      f();
+      return;
+    }
+    std::string sent_prefix = body.substr(0, prefix.size());
+    if (sent_prefix != prefix) {
+      f();
+      return;
+    }
+    std::string num = body.substr(prefix.size());
+    std::size_t x = {};
+    try {
+      x = std::stoi(num);
+    } catch (std::exception) {
+      f();
+      return;
+    }
+
+    my_program_state::set_request_count(x);
+
+    if (request_.target() == "/count") {
+      response_.set(http::field::content_type, "text/html");
+      beast::ostream(response_.body())
+          << "<html>\n"
+          << "<head><title>Set request count</title></head>\n"
+          << "<body>\n"
+          << "<h1>Set request count</h1>\n"
+          << "<p>request count has been set to " << x << " .</p>\n"
+          << "</body>\n"
+          << "</html>\n";
+    } else if (request_.target() == "/time") {
+      response_.set(http::field::content_type, "text/html");
+      response_.result(http::status::bad_request);
+      response_.set(http::field::content_type, "text/plain");
+      beast::ostream(response_.body()) << "post for time is not supported\r\n";
+    } else {
+      response_.result(http::status::not_found);
+      response_.set(http::field::content_type, "text/plain");
+      beast::ostream(response_.body()) << "File not found\r\n";
+    }
   }
 
   // Construct a response message based on the program state.

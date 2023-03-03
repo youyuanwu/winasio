@@ -102,6 +102,7 @@ public:
     headers_available,
     data_available,
     read_complete,
+    write_complete,
     error
   };
 
@@ -233,6 +234,12 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::send_request);
     cpContext->step_complete(ec);
     break;
+  case WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE: {
+    BOOST_ASSERT(cpContext->get_state() == ctx_state_type::write_complete);
+    BOOST_ASSERT(dwStatusInformationLength == sizeof(DWORD));
+    DWORD data_len = *((LPDWORD)lpvStatusInformation);
+    cpContext->step_complete(ec, data_len);
+  } break;
   case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
     WINHTTP_ASYNC_RESULT *pAR = (WINHTTP_ASYNC_RESULT *)lpvStatusInformation;
     std::wstring err;
@@ -259,8 +266,11 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
       BOOST_ASSERT(pAR->dwResult == API_SEND_REQUEST);
       cpContext->step_complete(ec);
       break;
+    case ctx_state_type::write_complete:
+      BOOST_ASSERT(pAR->dwResult == API_WRITE_DATA);
+      cpContext->step_complete(ec, 0);
+      break;
     default:
-      // TODO: WinHttpWriteData is not used yet.
       // API_GET_PROXY_FOR_URL is not used.
 #ifdef WINASIO_LOG
       BOOST_LOG_TRIVIAL(debug)
@@ -298,6 +308,7 @@ public:
   }
 
   // open request using manged asio callback and ctx
+  // TODO: dwFlags WINHTTP_FLAG_AUTOMATIC_CHUNKING can be used for streaming.
   void managed_open(HINTERNET hConnect, LPCWSTR pwszVerb,
                     LPCWSTR pwszObjectName, LPCWSTR pwszVersion,
                     LPCWSTR pwszReferrer, LPCWSTR *ppwszAcceptTypes,
@@ -410,6 +421,30 @@ public:
     parent_type::read_data(lpBuffer, dwNumberOfBytesToRead,
                            NULL, // lpdwNumberOfBytesRead
                            ec);
+    if (ec) {
+      ctx_.set_state(ctx_state_type::error);
+      ctx_.step_complete(ec, 0);
+    }
+    return boost::asio::async_compose<Handler, void(boost::system::error_code,
+                                                    std::size_t)>(
+        async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
+                                    &ctx_.step_len),
+        token, ctx_.step_event);
+  }
+
+  // callback case: WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE
+  // handler signature is void(boost::system::error_code, std::size_t)
+  // user can call async_read_data again in token.
+  template <typename Handler>
+  auto async_write_data(_In_ LPCVOID lpBuffer,
+                        _In_ DWORD dwNumberOfBytesToWrite, Handler &&token) {
+
+    boost::system::error_code ec;
+    ctx_.set_state(ctx_state_type::write_complete);
+    ctx_.step_reset();
+    parent_type::write_data(lpBuffer, dwNumberOfBytesToWrite,
+                            NULL, // lpdwNumberOfBytesWritten
+                            ec);
     if (ec) {
       ctx_.set_state(ctx_state_type::error);
       ctx_.step_complete(ec, 0);

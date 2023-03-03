@@ -15,24 +15,35 @@
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
 
+class beast_server {
+public:
+  beast_server() : lch_(1), ioc_(1), th_() {
+    my_program_state::set_request_count(0);
+    th_ = std::jthread([this]() {
+      // start beast server
+      unsigned short port = static_cast<unsigned short>(12345);
+      myacceptor acceptor{ioc_, {tcp::v4(), port}};
+      mysocket socket{ioc_};
+      http_server(acceptor, socket);
+      lch_.count_down();
+      ioc_.run();
+    });
+    // wait for server to run;
+    lch_.wait();
+  }
+
+  ~beast_server() { ioc_.stop(); }
+
+private:
+  std::latch lch_;
+  net::io_context ioc_;
+  std::jthread th_;
+};
+
 BOOST_AUTO_TEST_SUITE(test_winhttp)
 
 BOOST_AUTO_TEST_CASE(Basic) {
-  net::io_context ioc{1};
-  std::latch lch{1}; // for waiting for server up
-  std::jthread th([&ioc, &lch]() {
-    // start beast server
-    // auto const address = net::ip::make_address("0.0.0.0");
-    unsigned short port = static_cast<unsigned short>(12345);
-    myacceptor acceptor{ioc, {tcp::v4(), port}};
-    mysocket socket{ioc};
-    http_server(acceptor, socket);
-    lch.count_down();
-    ioc.run();
-  });
-  // wait for server to run;
-  lch.wait();
-  // std::this_thread::sleep_for(std::chrono::seconds(1));
+  beast_server bs;
 
   boost::system::error_code ec;
   net::io_context io_context;
@@ -98,9 +109,6 @@ BOOST_AUTO_TEST_CASE(Basic) {
       });
 
   io_context.run();
-
-  // stop server
-  ioc.stop();
 }
 
 BOOST_AUTO_TEST_CASE(ObjectHandleAlreadySet) {
@@ -138,19 +146,7 @@ BOOST_AUTO_TEST_CASE(ObjectHandleAlreadySet) {
 }
 
 BOOST_AUTO_TEST_CASE(Coroutine) {
-  net::io_context ioc{1};
-  std::latch lch{1}; // for waiting for server up
-  std::jthread th([&ioc, &lch]() {
-    // start beast server
-    unsigned short port = static_cast<unsigned short>(12345);
-    myacceptor acceptor{ioc, {tcp::v4(), port}};
-    mysocket socket{ioc};
-    http_server(acceptor, socket);
-    lch.count_down();
-    ioc.run();
-  });
-  // wait for server to run;
-  lch.wait();
+  beast_server bs;
 
   boost::system::error_code ec;
   net::io_context io_context;
@@ -169,21 +165,11 @@ BOOST_AUTO_TEST_CASE(Coroutine) {
                     url.get_port(), ec);
   BOOST_REQUIRE(!ec.failed());
 
-  // winnet::winhttp::payload pl;
-  // pl.method = L"GET";
-  // pl.path = url.get_path();
-  // pl.header = std::nullopt;
-  // pl.accept = std::nullopt;
-  // pl.body = std::nullopt;
-  // pl.secure = false;
-
+  // test GET request
   winnet::winhttp::basic_winhttp_request_asio_handle<
       net::io_context::executor_type>
       h_request(io_context.get_executor());
-
-  auto f = [&h_request, &h_connect, &url]() -> net::awaitable<void> {
-    auto executor = co_await net::this_coro::executor;
-    boost::system::error_code ec;
+  {
     std::wstring path = url.get_path();
     h_request.managed_open(h_connect.native_handle(), L"GET", path.c_str(),
                            NULL, // http 1.1
@@ -192,36 +178,86 @@ BOOST_AUTO_TEST_CASE(Coroutine) {
                            ec);
     BOOST_REQUIRE(!ec);
 
-    co_await h_request.async_send(NULL,                    // headers
-                                  0,                       // header len
-                                  WINHTTP_NO_REQUEST_DATA, // optional
-                                  0,                       // optional len
-                                  0,                       // total len
-                                  net::use_awaitable);
+    auto f = [&h_request, &url]() -> net::awaitable<void> {
+      auto executor = co_await net::this_coro::executor;
 
-    std::vector<BYTE> body_buff;
-    auto dybuff = net::dynamic_buffer(body_buff);
+      co_await h_request.async_send(NULL,                    // headers
+                                    0,                       // header len
+                                    WINHTTP_NO_REQUEST_DATA, // optional
+                                    0,                       // optional len
+                                    0,                       // total len
+                                    net::use_awaitable);
 
-    co_await h_request.async_recieve_response(net::use_awaitable);
-    std::size_t len = 0;
-    do {
-      len = co_await h_request.async_query_data_available(net::use_awaitable);
-      auto buff = dybuff.prepare(len + 1);
-      std::size_t read_len = co_await h_request.async_read_data(
-          (LPVOID)buff.data(), static_cast<DWORD>(len), net::use_awaitable);
-      BOOST_REQUIRE_EQUAL(read_len, len);
-      dybuff.commit(len);
-    } while (len > 0);
-    BOOST_TEST_MESSAGE("request body:");
-    BOOST_TEST_MESSAGE(winnet::winhttp::buff_to_string(dybuff));
-  };
+      std::vector<BYTE> body_buff;
+      auto dybuff = net::dynamic_buffer(body_buff);
 
-  net::co_spawn(io_context, f, net::detached);
+      co_await h_request.async_recieve_response(net::use_awaitable);
+      std::size_t len = 0;
+      do {
+        len = co_await h_request.async_query_data_available(net::use_awaitable);
+        auto buff = dybuff.prepare(len + 1);
+        std::size_t read_len = co_await h_request.async_read_data(
+            (LPVOID)buff.data(), static_cast<DWORD>(len), net::use_awaitable);
+        BOOST_REQUIRE_EQUAL(read_len, len);
+        dybuff.commit(len);
+      } while (len > 0);
+      BOOST_TEST_MESSAGE("request body:");
+      BOOST_TEST_MESSAGE(winnet::winhttp::buff_to_string(dybuff));
+    };
+    net::co_spawn(io_context, f, net::detached);
+  }
+
+  // test POST request
+  winnet::winhttp::basic_winhttp_request_asio_handle<
+      net::io_context::executor_type>
+      h_request2(io_context.get_executor());
+  {
+    std::wstring path = url.get_path();
+    h_request2.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
+                            NULL, // http 1.1
+                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                            NULL, // no ssl WINHTTP_FLAG_SECURE,
+                            ec);
+    BOOST_REQUIRE(!ec);
+
+    auto f = [&h_request2, &url]() -> net::awaitable<void> {
+      auto executor = co_await net::this_coro::executor;
+
+      std::string req_body = "set_count=100";
+      DWORD req_len = static_cast<DWORD>(req_body.size());
+      co_await h_request2.async_send(
+          NULL,                                // headers
+          0,                                   // header len
+          NULL,                                // optional
+          0,                                   // optional len
+          static_cast<DWORD>(req_body.size()), // total len
+          net::use_awaitable);
+
+      std::size_t write_len = co_await h_request2.async_write_data(
+          (LPCVOID)req_body.data(), req_len, net::use_awaitable);
+      BOOST_REQUIRE_EQUAL(req_len, write_len);
+
+      std::vector<BYTE> body_buff;
+      auto dybuff = net::dynamic_buffer(body_buff);
+
+      co_await h_request2.async_recieve_response(net::use_awaitable);
+      std::size_t len = 0;
+      do {
+        len =
+            co_await h_request2.async_query_data_available(net::use_awaitable);
+        auto buff = dybuff.prepare(len + 1);
+        std::size_t read_len = co_await h_request2.async_read_data(
+            (LPVOID)buff.data(), static_cast<DWORD>(len), net::use_awaitable);
+        BOOST_REQUIRE_EQUAL(read_len, len);
+        dybuff.commit(len);
+      } while (len > 0);
+      BOOST_TEST_MESSAGE("request body:");
+      BOOST_TEST_MESSAGE(winnet::winhttp::buff_to_string(dybuff));
+    };
+    net::co_spawn(io_context, f, net::detached);
+  }
 
   io_context.run();
-
-  // stop server
-  ioc.stop();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
