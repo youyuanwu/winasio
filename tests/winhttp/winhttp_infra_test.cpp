@@ -1,4 +1,4 @@
-#define BOOST_TEST_MODULE http_client
+#define BOOST_TEST_MODULE winhttp_test
 #include <boost/test/unit_test.hpp>
 
 #include "boost/asio.hpp"
@@ -74,7 +74,7 @@ namespace winnet = boost::winasio;
 //   BOOST_LOG_TRIVIAL(debug) << std::string(data.begin(), data.end());
 // }
 
-BOOST_AUTO_TEST_SUITE(test_http_client)
+BOOST_AUTO_TEST_SUITE(test_winhttp_infra)
 
 BOOST_AUTO_TEST_CASE(CrackURL) {
   boost::system::error_code ec;
