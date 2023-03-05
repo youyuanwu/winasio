@@ -5,6 +5,7 @@
 #include "boost/winasio/winhttp/winhttp.hpp"
 
 #include "boost/winasio/winhttp/client.hpp"
+#include "boost/winasio/winhttp/winhttp_stream.hpp"
 
 // use beast server for testing
 #include "beast_test_server.hpp"
@@ -169,17 +170,17 @@ BOOST_AUTO_TEST_CASE(Coroutine) {
   // test GET request
   winnet::winhttp::basic_winhttp_request_asio_handle<
       net::io_context::executor_type>
-      h_request(io_context.get_executor());
+      h_request1(io_context.get_executor());
   {
     std::wstring path = url.get_path();
-    h_request.managed_open(h_connect.native_handle(), L"GET", path.c_str(),
-                           NULL, // http 1.1
-                           WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                           NULL, // no ssl WINHTTP_FLAG_SECURE,
-                           ec);
+    h_request1.managed_open(h_connect.native_handle(), L"GET", path.c_str(),
+                            NULL, // http 1.1
+                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                            NULL, // no ssl WINHTTP_FLAG_SECURE,
+                            ec);
     BOOST_REQUIRE(!ec);
 
-    auto f = [&h_request, &url]() -> net::awaitable<void> {
+    auto f = [&h_request = h_request1, &url]() -> net::awaitable<void> {
       try {
         auto executor = co_await net::this_coro::executor;
 
@@ -261,6 +262,53 @@ BOOST_AUTO_TEST_CASE(Coroutine) {
         } while (len > 0);
         BOOST_TEST_MESSAGE("request body:");
         BOOST_TEST_MESSAGE(winnet::winhttp::buff_to_string(dybuff));
+      } catch (const std::exception &e) {
+        BOOST_REQUIRE_MESSAGE(false,
+                              std::string("coro has exception ") + e.what());
+      }
+    };
+    net::co_spawn(io_context, f, net::detached);
+  }
+
+  // test using stream
+  winnet::winhttp::basic_winhttp_request_stream_handle<
+      net::io_context::executor_type>
+      h_stream(io_context.get_executor());
+  {
+    std::wstring path = url.get_path();
+    h_stream.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
+                          NULL, // http 1.1
+                          WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                          NULL, // no ssl WINHTTP_FLAG_SECURE,
+                          ec);
+    BOOST_REQUIRE(!ec);
+
+    auto f = [&h_request = h_stream, &url]() -> net::awaitable<void> {
+      try {
+        auto executor = co_await net::this_coro::executor;
+
+        std::string req_body = "set_count=200";
+        DWORD req_len = static_cast<DWORD>(req_body.size());
+        co_await h_request.async_send(
+            NULL,                                // headers
+            0,                                   // header len
+            NULL,                                // optional
+            0,                                   // optional len
+            static_cast<DWORD>(req_body.size()), // total len
+            net::use_awaitable);
+
+        std::size_t write_len = co_await net::async_write(
+            h_request, net::buffer(req_body), net::use_awaitable);
+
+        BOOST_REQUIRE_EQUAL(req_len, write_len);
+
+        co_await h_request.async_recieve_response(net::use_awaitable);
+
+        std::vector<BYTE> body_buff;
+        co_await net::async_read(h_request, net::dynamic_buffer(body_buff),
+                                 net::use_awaitable);
+        BOOST_TEST_MESSAGE("request body:");
+        BOOST_TEST_MESSAGE(std::string(body_buff.begin(), body_buff.end()));
       } catch (const std::exception &e) {
         BOOST_REQUIRE_MESSAGE(false,
                               std::string("coro has exception ") + e.what());

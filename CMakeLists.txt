@@ -23,7 +23,9 @@ endif(${winasio_MAIN_PROJECT})
 set(Boost_USE_STATIC_LIBS ON) # use static boost
 find_package(Boost REQUIRED COMPONENTS log) # log is used for tests
 
-add_library(winasio INTERFACE)
+file(GLOB_RECURSE WINASIO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
+
+add_library(winasio INTERFACE ${WINASIO_SOURCES})
 target_include_directories(winasio INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

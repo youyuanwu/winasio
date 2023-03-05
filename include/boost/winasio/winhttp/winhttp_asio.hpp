@@ -12,6 +12,8 @@ namespace winhttp {
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
 
+namespace details {
+
 // Compose operation to support coroutine
 // pass in an oh, and init by async compose, in WinHttp callback then set the
 // event, then the operation is compeleted. This is just a wrapper to support
@@ -290,6 +292,8 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
   }
 }
 
+} // namespace details
+
 // wrapper for requeset handle to perform async operations
 template <typename Executor = net::any_io_executor>
 class basic_winhttp_request_asio_handle
@@ -300,7 +304,7 @@ public:
 
   typedef basic_winhttp_request_handle<executor_type> parent_type;
 
-  typedef asio_request_context<executor_type>::state ctx_state_type;
+  typedef details::asio_request_context<executor_type>::state ctx_state_type;
 
   explicit basic_winhttp_request_asio_handle(const executor_type &ex)
       : basic_winhttp_request_handle<executor_type>(ex), ctx_(ex) {
@@ -320,7 +324,7 @@ public:
     }
     // using managed callback
     this->set_status_callback(
-        (WINHTTP_STATUS_CALLBACK)BasicAsioAsyncCallback<executor_type>,
+        (WINHTTP_STATUS_CALLBACK)details::BasicAsioAsyncCallback<executor_type>,
         WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS, ec);
     if (ec) {
       return;
@@ -364,8 +368,8 @@ public:
     // defer to winhttp to invoke callback
     // callback/token is passed to a windows event/object handle in ctx
     return boost::asio::async_compose<Handler, void(boost::system::error_code)>(
-        async_op<executor_type>(&ctx_.step_event, &ctx_.step_ec), token,
-        ctx_.step_event);
+        details::async_op<executor_type>(&ctx_.step_event, &ctx_.step_ec),
+        token, ctx_.step_event);
   }
 
   // callback case: WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE
@@ -383,8 +387,8 @@ public:
     }
 
     return boost::asio::async_compose<Handler, void(boost::system::error_code)>(
-        async_op<executor_type>(&ctx_.step_event, &ctx_.step_ec), token,
-        ctx_.step_event);
+        details::async_op<executor_type>(&ctx_.step_event, &ctx_.step_ec),
+        token, ctx_.step_event);
   }
 
   // can be invoke in async_recieve_response or ...
@@ -404,8 +408,8 @@ public:
     }
     return boost::asio::async_compose<Handler, void(boost::system::error_code,
                                                     std::size_t)>(
-        async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
-                                    &ctx_.step_len),
+        details::async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
+                                             &ctx_.step_len),
         token, ctx_.step_event);
   }
 
@@ -427,8 +431,8 @@ public:
     }
     return boost::asio::async_compose<Handler, void(boost::system::error_code,
                                                     std::size_t)>(
-        async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
-                                    &ctx_.step_len),
+        details::async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
+                                             &ctx_.step_len),
         token, ctx_.step_event);
   }
 
@@ -451,13 +455,13 @@ public:
     }
     return boost::asio::async_compose<Handler, void(boost::system::error_code,
                                                     std::size_t)>(
-        async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
-                                    &ctx_.step_len),
+        details::async_len_op<executor_type>(&ctx_.step_event, &ctx_.step_ec,
+                                             &ctx_.step_len),
         token, ctx_.step_event);
   }
 
 private:
-  asio_request_context<executor_type> ctx_;
+  details::asio_request_context<executor_type> ctx_;
 };
 
 namespace details {
