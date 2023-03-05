@@ -270,6 +270,73 @@ BOOST_AUTO_TEST_CASE(Coroutine) {
     net::co_spawn(io_context, f, net::detached);
   }
 
+  // stress test async by read and write one byte at a time.
+  winnet::winhttp::basic_winhttp_request_asio_handle<
+      net::io_context::executor_type>
+      h_request3(io_context.get_executor());
+  {
+    std::wstring path = url.get_path();
+    h_request3.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
+                            NULL, // http 1.1
+                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                            NULL, // no ssl WINHTTP_FLAG_SECURE,
+                            ec);
+    BOOST_REQUIRE(!ec);
+
+    auto f = [&h_request = h_request3, &url]() -> net::awaitable<void> {
+      try {
+        auto executor = co_await net::this_coro::executor;
+
+        std::string req_body = "set_count=111";
+        DWORD req_len = static_cast<DWORD>(req_body.size());
+        co_await h_request.async_send(
+            NULL,                                // headers
+            0,                                   // header len
+            NULL,                                // optional
+            0,                                   // optional len
+            static_cast<DWORD>(req_body.size()), // total len
+            net::use_awaitable);
+
+        // write data byte by byte to stress test
+        std::size_t written_len = 0;
+        for (auto it = req_body.begin(); it < req_body.end(); it++) {
+          char c = *it;
+          const std::size_t to_write_len = 1;
+          std::size_t write_len = co_await h_request.async_write_data(
+              (LPCVOID)&c, to_write_len, net::use_awaitable);
+          written_len += write_len;
+        }
+        BOOST_REQUIRE_EQUAL(req_len, written_len);
+
+        co_await h_request.async_recieve_response(net::use_awaitable);
+
+        // read bytes one by one
+        std::size_t total_read = {};
+        std::string body = {};
+        while (true) {
+          std::size_t len =
+              co_await h_request.async_query_data_available(net::use_awaitable);
+          if (len == 0) {
+            break;
+          }
+          char c = {};
+          std::size_t read_len = co_await h_request.async_read_data(
+              (LPVOID)&c, 1, net::use_awaitable);
+          total_read += read_len;
+          body += c;
+        }
+        BOOST_CHECK_EQUAL(total_read, body.size());
+
+        BOOST_TEST_MESSAGE("request body:");
+        BOOST_TEST_MESSAGE(body);
+      } catch (const std::exception &e) {
+        BOOST_REQUIRE_MESSAGE(false,
+                              std::string("coro has exception ") + e.what());
+      }
+    };
+    net::co_spawn(io_context, f, net::detached);
+  }
+
   // test using stream
   winnet::winhttp::basic_winhttp_request_stream_handle<
       net::io_context::executor_type>
