@@ -156,6 +156,7 @@ private:
     my_program_state::set_request_count(x);
 
     if (request_.target() == "/count") {
+      response_.result(http::status::created);
       response_.set(http::field::content_type, "text/html");
       beast::ostream(response_.body())
           << "<html>\n"

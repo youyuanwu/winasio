@@ -49,7 +49,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.BUILD_TYPE }}
     
     - name: run test
-      run: ctest -C ${{ matrix.BUILD_TYPE }} --test-dir build --verbose --repeat until-pass:3 --timeout 30
+      run: ctest -C ${{ matrix.BUILD_TYPE }} --test-dir build --verbose --repeat until-pass:3 --timeout 30 --output-on-failure
 
     - name: run test with coverage
       if: ${{ matrix.BUILD_TYPE == 'Debug' }}

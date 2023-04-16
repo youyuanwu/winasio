@@ -64,7 +64,7 @@ if(winasio_BuildTests)
         add_custom_target(coverage
             COMMAND ${OpenCppCoverage_exe} --quiet --export_type cobertura:cobertura.xml --cover_children 
             --sources "${PWD_WIN_PATH}\\src" --sources "${PWD_WIN_PATH}\\include" --modules "${PWD_WIN_PATH}"
-            -- ctest -C Debug --test-dir build --repeat until-pass:3 --timeout 30
+            -- ctest -C Debug --test-dir build --repeat until-pass:3 --timeout 30 --output-on-failure
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         )
     else()
