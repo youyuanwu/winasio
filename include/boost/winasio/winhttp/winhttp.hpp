@@ -363,7 +363,7 @@ public:
 #ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug)
         << "WinHttpReadData: "
-        << "ToRead=" << dwNumberOfBytesToRead << " status: " << ec;
+        << "ToRead= " << dwNumberOfBytesToRead << " status: " << ec;
 #endif
   }
 
@@ -377,6 +377,11 @@ public:
       ec = boost::system::error_code(GetLastError(),
                                      boost::asio::error::get_system_category());
     }
+#ifdef WINASIO_LOG
+    BOOST_LOG_TRIVIAL(debug)
+        << "WinHttpWriteData: "
+        << "ToWrite= " << dwNumberOfBytesToWrite << " status: " << ec;
+#endif
   }
 
   // call back case: WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE

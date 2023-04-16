@@ -135,15 +135,16 @@ public:
   // This sets the event so that asio handler/token gets run,
   // and ec value will be accessable in handler.
   void step_complete(boost::system::error_code ec, std::size_t len = 0) {
-    // sets the event and remembers the error
+    // remembers the error and then set the event
+    this->step_ec = ec;
+    this->step_len = len;
+
     HANDLE h = this->step_event.native_handle();
     assert(h != NULL);
     assert(h != INVALID_HANDLE_VALUE);
     bool ok = SetEvent(h);
     assert(ok);
     DBG_UNREFERENCED_LOCAL_VARIABLE(ok);
-    this->step_ec = ec;
-    this->step_len = len;
   }
 
   // reset event and clear ec.
@@ -228,7 +229,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     // parameter indicates the size of lpvStatusInformation.
 #ifdef WINASIO_LOG
     BOOST_LOG_TRIVIAL(debug)
-        << "READ_COMPLETE Number of bytes read" << dwStatusInformationLength;
+        << "READ_COMPLETE Number of bytes read " << dwStatusInformationLength;
 #endif
     // Copy the data and delete the buffers.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::read_complete);
@@ -247,6 +248,9 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::write_complete);
     BOOST_ASSERT(dwStatusInformationLength == sizeof(DWORD));
     DWORD data_len = *((LPDWORD)lpvStatusInformation);
+#ifdef WINASIO_LOG
+    BOOST_LOG_TRIVIAL(debug) << L"WRITE_COMPLETE len: " << data_len;
+#endif
     cpContext->step_complete(ec, data_len);
   } break;
   case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
