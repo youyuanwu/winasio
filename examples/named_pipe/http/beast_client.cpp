@@ -17,9 +17,12 @@
 
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#pragma warning(push)
+#pragma warning(disable : 4702)
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
+#pragma warning(pop)
 
 #include <boost/winasio/named_pipe/named_pipe_protocol.hpp>
 

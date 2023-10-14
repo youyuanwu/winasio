@@ -21,6 +21,7 @@ endif(${winasio_MAIN_PROJECT})
 
 
 set(Boost_USE_STATIC_LIBS ON) # use static boost
+set(Boost_NO_WARN_NEW_VERSIONS ON)
 find_package(Boost REQUIRED COMPONENTS log) # log is used for tests
 
 file(GLOB_RECURSE WINASIO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
