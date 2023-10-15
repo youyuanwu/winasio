@@ -56,11 +56,20 @@ public:
   async_accept(named_pipe<executor_type> &pipe,
                BOOST_ASIO_MOVE_ARG(AcceptToken)
                    token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
-
-    return boost::asio::async_compose<AcceptToken,
-                                      void(boost::system::error_code)>(
-        details::async_accept_op<executor_type>(&pipe, this->endpoint_), token,
-        pipe);
+    return boost::asio::async_initiate<decltype(token),
+                                       void(boost::system::error_code)>(
+        [this, &pipe](auto handler) {
+          boost::system::error_code ec;
+          pipe.server_create(ec, endpoint_);
+          if (ec) {
+            std::move(handler)(ec);
+            return;
+          }
+          pipe.async_server_connect(
+              [h = std::move(handler), this](
+                  boost::system::error_code ec) mutable { std::move(h)(ec); });
+        },
+        token);
   }
 
   // TODO: fix move and rebind executor
@@ -73,14 +82,22 @@ public:
                                           named_pipe<executor_type>))
   async_accept(BOOST_ASIO_MOVE_ARG(MoveAcceptToken)
                    token BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
-    // std::cout << "async_accept func" << std::endl;
-
-    return boost::asio::async_compose<MoveAcceptToken,
-                                      void(boost::system::error_code,
-                                           named_pipe<executor_type>)>(
-        details::async_move_accept_op<executor_type>(&this->pipe_,
-                                                     this->endpoint_),
-        token, this->pipe_);
+    return boost::asio::async_initiate<decltype(token),
+                                       void(boost::system::error_code,
+                                            named_pipe<executor_type>)>(
+        [this](auto handler) {
+          boost::system::error_code ec;
+          pipe_.server_create(ec, endpoint_);
+          if (ec) {
+            std::move(handler)(ec, std::move(pipe_));
+            return;
+          }
+          pipe_.async_server_connect([h = std::move(handler), this](
+                                         boost::system::error_code ec) mutable {
+            std::move(h)(ec, std::move(pipe_));
+          });
+        },
+        token);
   }
 
   const endpoint_type endpoint_;

@@ -75,50 +75,53 @@ public:
     parent_type::assign(hPipe);
   }
 
-  template <BOOST_ASIO_COMPLETION_TOKEN_FOR(void(boost::system::error_code,
-                                                 std::size_t)) ConnectHandler
-                BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(ConnectHandler,
-                                     void(boost::system::error_code,
-                                          std::size_t))
-  async_server_connect(
-      BOOST_ASIO_MOVE_ARG(ConnectHandler)
-          handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
-    boost::system::error_code ec;
-    boost::asio::windows::overlapped_ptr optr(this->get_executor(),
-                                              std::move(handler));
-    bool fConnected = false;
-    fConnected = ConnectNamedPipe(this->native_handle(), optr.get());
-    // Overlapped ConnectNamedPipe should return zero.
-    if (fConnected) {
-      // printf("ConnectNamedPipe failed with %d.\n", GetLastError());
-      ec = boost::system::error_code(::GetLastError(),
-                                     boost::system::system_category());
-      optr.complete(ec, 0);
-      return;
-    }
+  template <typename Token> auto async_server_connect(Token &&token) {
+    return boost::asio::async_initiate<decltype(token),
+                                       void(boost::system::error_code)>(
+        [this](auto handler) {
+          // init optr to pass through the user handler.
+          boost::asio::windows::overlapped_ptr optr(
+              this->get_executor(),
+              [h = std::move(handler)](boost::system::error_code ec,
+                                       std::size_t) mutable {
+                std::move(h)(ec);
+              });
+          boost::system::error_code ec;
+          bool fConnected = false;
+          fConnected = ConnectNamedPipe(this->native_handle(), optr.get());
+          // Overlapped ConnectNamedPipe should return zero.
+          if (fConnected) {
+            // printf("ConnectNamedPipe failed with %d.\n", GetLastError());
+            ec = boost::system::error_code(::GetLastError(),
+                                           boost::system::system_category());
+            optr.complete(ec, 0);
+            return;
+          }
 
-    switch (GetLastError()) {
-    // The overlapped connection in progress.
-    case ERROR_IO_PENDING:
-      optr.release();
-      break;
-    // Client is already connected, so signal an event.
-    case ERROR_PIPE_CONNECTED: {
-      // In the win32 example here we need to reset the overlapp event when pipe
-      // already is connected. But this case overlapped_ptr cannot trigger this
-      // because iocp does not register this pipe instance.
-      optr.complete(ec, 0);
-      break;
-    }
-    // If an error occurs during the connect operation...
-    default: {
-      // printf("Some named pipe op failed with %d.\n", GetLastError());
-      ec = boost::system::error_code(::GetLastError(),
-                                     boost::asio::error::get_system_category());
-      optr.complete(ec, 0);
-    }
-    }
+          switch (GetLastError()) {
+          // The overlapped connection in progress.
+          case ERROR_IO_PENDING:
+            optr.release();
+            break;
+          // Client is already connected, so signal an event.
+          case ERROR_PIPE_CONNECTED: {
+            // In the win32 example here we need to reset the overlapp event
+            // when pipe already is connected. But this case overlapped_ptr
+            // cannot trigger this because iocp does not register this pipe
+            // instance.
+            optr.complete(ec, 0);
+            break;
+          }
+          // If an error occurs during the connect operation...
+          default: {
+            // printf("Some named pipe op failed with %d.\n", GetLastError());
+            ec = boost::system::error_code(
+                ::GetLastError(), boost::asio::error::get_system_category());
+            optr.complete(ec, 0);
+          }
+          }
+        },
+        token);
   }
 
   // used for client to connect
