@@ -1,11 +1,22 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(winasio)
-
 set(winasio_MAIN_PROJECT OFF)
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     set(winasio_MAIN_PROJECT ON)
 endif()
+
+if(winasio_MAIN_PROJECT AND NOT WINASIO_CI_FORMAT)
+    # configure vcpkg
+    # we use CmakePresets.json to point to vcpkg
+    if ("$ENV{VCPKG_ROOT}" STREQUAL "")
+    message(FATAL_ERROR "VCPKG_ROOT not found")
+    endif()
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+endif()
+
+project(winasio VERSION 0.0.1 LANGUAGES CXX)
+
+message(STATUS "vcpkg installed dir: ${VCPKG_INSTALLED_DIR}")
 
 option(winasio_BuildTests     "Build the unit tests when BUILD_TESTING is enabled." ${winasio_MAIN_PROJECT})
 option(winasio_BuildExamples  "Build examples"                                      ${winasio_MAIN_PROJECT})

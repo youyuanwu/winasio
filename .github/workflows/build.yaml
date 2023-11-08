@@ -9,7 +9,6 @@ jobs:
       matrix:
         BUILD_TYPE: ["Debug", "Release"]
         os: [ windows-latest ]
-        BOOST_VERSION: [ 1.79.0, 1.83.0 ]
     steps:
     - uses: actions/checkout@v2
 
@@ -19,17 +18,10 @@ jobs:
     - name: Get specific version CMake, v3.21.2
       uses: lukka/get-cmake@v3.21.2
     
-    - name: Get Boost
-      uses: MarkusJx/install-boost@v2.4.1
-      id: install-boost
+    - name: Setup vcpkg (it does not install any package yet)
+      uses: lukka/run-vcpkg@v11
       with:
-        # REQUIRED: Specify the required boost version
-        # A list of supported versions can be found here: 
-        # https://github.com/MarkusJx/prebuilt-boost/blob/main/versions-manifest.json
-        boost_version: ${{ matrix.BOOST_VERSION }}
-        toolset: msvc
-        platform_version: 2022
-        link: static
+        vcpkgGitCommitId: 486a4640db740f5994e492eb60748111dfc48de7
     
     - name: Get OpenCppCoverage
       if: ${{ matrix.BUILD_TYPE == 'Debug' }}
@@ -41,8 +33,6 @@ jobs:
         powershell.exe -Command "Add-Content $env:GITHUB_PATH 'C:\Program Files\OpenCppCoverage'"
 
     - name: run cmake
-      env:
-        BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
       run: > 
         cmake . -DCMAKE_BUILD_TYPE=${{ matrix.BUILD_TYPE }} -B build
     - name: run build
