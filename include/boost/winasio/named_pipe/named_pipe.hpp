@@ -127,7 +127,7 @@ public:
   // used for client to connect
   BOOST_ASIO_SYNC_OP_VOID connect(const endpoint_type &endpoint,
                                   boost::system::error_code &ec,
-                                  int timeout_ms = 20000) {
+                                  std::uint32_t timeout_ms = 20000) {
 
     if (boost::asio::windows::basic_stream_handle<executor_type>::is_open()) {
       boost::asio::windows::basic_stream_handle<executor_type>::close();
