@@ -49,6 +49,9 @@ public:
           0)
       : boost::asio::windows::basic_stream_handle<executor_type>(
             context.get_executor()) {}
+  
+  named_pipe(named_pipe<executor_type> && other)
+    : boost::asio::windows::basic_stream_handle<executor_type>(std::move(other)) {}
 
   void server_create(boost::system::error_code &ec,
                      endpoint_type const &endpoint) {
