@@ -38,7 +38,7 @@ public:
   typedef std::string endpoint_type;
   typedef boost::asio::windows::basic_stream_handle<executor_type> parent_type;
 
-  named_pipe(executor_type &ex)
+  named_pipe(const executor_type &ex)
       : boost::asio::windows::basic_stream_handle<executor_type>(ex) {}
 
   template <typename ExecutionContext>
