@@ -44,7 +44,7 @@ target_include_directories(winasio INTERFACE
 
 # header only
 target_compile_definitions(winasio
-    INTERFACE _WIN32_WINNT=0x0601
+    INTERFACE _WIN32_WINNT=0x0602
 #    INTERFACE WINASIO_LOG=1
 )
 

@@ -20,7 +20,8 @@ namespace details {
 // client connect to the namedpipe,
 // return the ok handle. Caller is responsible for freeing the handle.
 inline void client_connect(boost::system::error_code &ec, HANDLE &pipe_ret,
-                           std::string const &endpoint, int timeout_ms) {
+                           std::string const &endpoint,
+                           std::uint32_t timeout_ms) {
 
   HANDLE hPipe;
   BOOL fSuccess = FALSE;

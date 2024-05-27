@@ -21,7 +21,7 @@ jobs:
     - name: Setup vcpkg (it does not install any package yet)
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgGitCommitId: 486a4640db740f5994e492eb60748111dfc48de7
+        vcpkgGitCommitId: 01f602195983451bc83e72f4214af2cbc495aa94
     
     - name: Get OpenCppCoverage
       if: ${{ matrix.BUILD_TYPE == 'Debug' }}
@@ -48,8 +48,8 @@ jobs:
     
     - name: Upload Report to Codecov
       if: ${{ matrix.BUILD_TYPE == 'Debug' }}
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v4
       with:
         files: ./cobertura.xml
         fail_ci_if_error: true
-        functionalities: fix
+        token: ${{ secrets.CODECOV_TOKEN }} # required
