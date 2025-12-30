@@ -15,7 +15,7 @@
 #include <boost/asio/error.hpp>
 
 #ifdef WINASIO_LOG
-#include <boost/log/trivial.hpp>
+#include <spdlog/spdlog.h>
 #endif
 
 #include <boost/winasio/http/http_major_version.hpp>
@@ -62,21 +62,20 @@ public:
     DWORD retCode = HttpCreateServerSession(HTTPAPI_VERSION_2, &session_id_, 0);
     if (retCode != NO_ERROR) {
 #ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error) << L"Failed to create session, err: " << retCode;
+      spdlog::error("Failed to create session, err: {}", retCode);
 #endif
       return;
     }
     retCode = HttpCreateUrlGroup(session_id_, &group_id_, 0);
     if (retCode != NO_ERROR) {
 #ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error)
-          << L"Failed to create url group, err: " << retCode;
+      spdlog::error("Failed to create url group, err: {}", retCode);
 #endif
       return;
     }
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << L"Successfully create url_session:"
-                             << session_id_ << ", url_group:" << group_id_;
+    spdlog::debug("Successfully create url_session: {} , url_group: {}",
+                  session_id_, group_id_);
 #endif
     HTTP_BINDING_INFO binding_info{};
     binding_info.RequestQueueHandle = queue_handle_.native_handle();
@@ -85,8 +84,7 @@ public:
                                       &binding_info, sizeof(binding_info));
     if (retCode != NO_ERROR) {
 #ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error)
-          << L"Failed to bind to request queue, err:" << retCode;
+      spdlog::error("Failed to bind to request queue, err: {}", retCode);
 #endif
     }
     BOOST_ASSERT(retCode == NO_ERROR);
@@ -106,8 +104,7 @@ public:
     DWORD retCode = HttpAddUrlToUrlGroup(group_id_, url.c_str(), 0, 0);
     if (retCode != NO_ERROR) {
 #ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error)
-          << L"Failed to add url: " << url << ", err : " << retCode;
+      spdlog::error(L"Failed to add url: {}, err : {}", url, retCode);
 #endif
     }
     ec = boost::system::error_code(retCode,
@@ -117,8 +114,7 @@ public:
     DWORD retCode = HttpRemoveUrlFromUrlGroup(group_id_, url.c_str(), 0);
     if (retCode != NO_ERROR) {
 #ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error)
-          << L"Failed to remove url: " << url << ", err : " << retCode;
+      spdlog::error(L"Failed to remove url: {}, err : {}", url, retCode);
 #endif
     }
     ec = boost::system::error_code(retCode,

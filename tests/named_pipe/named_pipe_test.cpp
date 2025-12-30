@@ -5,8 +5,7 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#define BOOST_TEST_MODULE named_pipe
-#include <boost/test/unit_test.hpp>
+#include <boost/ut.hpp>
 
 #include "named_pipe/echoserver_movable.hpp"
 #include "test_client.hpp"
@@ -46,9 +45,9 @@ template <typename Server> void test_server() {
           std::string("myMessage") + std::to_string(n) + "hi";
       std::string replyMsg;
       boost::system::error_code ec = make_client_call(myMessage, replyMsg);
-      BOOST_CHECK_MESSAGE(!ec.failed(), myMessage + " failed: " + ec.message());
+      boost::ut::expect(!ec.failed()) << myMessage + " failed: " + ec.message();
       if (!ec.failed()) {
-        BOOST_CHECK_EQUAL(myMessage, replyMsg);
+        boost::ut::expect(myMessage == replyMsg);
       }
       sem.release();
     });
@@ -58,9 +57,9 @@ template <typename Server> void test_server() {
   std::string myMessage = std::string("myMessage adhoc");
   std::string replyMsg;
   boost::system::error_code ec = make_client_call(myMessage, replyMsg);
-  BOOST_CHECK(!ec.failed());
+  boost::ut::expect(!ec.failed());
   if (!ec.failed()) {
-    BOOST_CHECK_EQUAL(myMessage, replyMsg);
+    boost::ut::expect(myMessage == replyMsg);
   }
 
   // let 3 clients race at the same time.
@@ -80,13 +79,15 @@ template <typename Server> void test_server() {
     }
   }
 
-  io_context.reset();
+  io_context.restart();
 }
 
-BOOST_AUTO_TEST_SUITE(test_named_pipe)
+boost::ut::suite errors = [] {
+  using namespace boost::ut;
 
-BOOST_AUTO_TEST_CASE(movable_server) { test_server<server_movable>(); }
+  "movable_server"_test = [] { test_server<server_movable>(); };
 
-BOOST_AUTO_TEST_CASE(nonmovable_server) { test_server<server>(); }
+  "nonmovable_server"_test = [] { test_server<server>(); };
+};
 
-BOOST_AUTO_TEST_SUITE_END()
+int main() {}

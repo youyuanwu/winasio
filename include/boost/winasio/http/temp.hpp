@@ -75,7 +75,7 @@ private:
 
   void receive_request() {
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << "http_connection receive_request";
+    spdlog::debug("http_connection receive_request");
 #endif
     auto self = this->shared_from_this();
     // this is the vector<char>
@@ -86,8 +86,7 @@ private:
         [self](boost::system::error_code ec, std::size_t) {
           if (ec) {
 #ifdef WINASIO_LOG
-            BOOST_LOG_TRIVIAL(debug)
-                << "async_recieve_request failed: " << ec.message();
+            spdlog::debug("async_recieve_request failed: {}", ec.message());
 #endif
           } else {
             self->on_receive_request();
@@ -108,8 +107,7 @@ private:
           UNREFERENCED_PARAMETER(len);
           if (ec) {
 #ifdef WINASIO_LOG
-            BOOST_LOG_TRIVIAL(debug)
-                << "async_recieve_body failed: " << ec.message();
+            spdlog::debug("async_recieve_body failed: {}", ec.message());
 #endif
           } else {
             self->on_recieve_body();
@@ -128,8 +126,7 @@ private:
         [self](boost::system::error_code ec, std::size_t) {
           if (ec) {
 #ifdef WINASIO_LOG
-            BOOST_LOG_TRIVIAL(debug)
-                << "async_send_response failed: " << ec.message();
+            spdlog::debug("async_send_response failed: {}", ec.message());
 #endif
           }
         });

@@ -15,6 +15,10 @@
 // compose operations for http
 #include <boost/winasio/http/basic_http_queue_handle.hpp>
 
+#ifdef WINASIO_LOG
+#include <spdlog/spdlog.h>
+#endif
+
 namespace boost {
 namespace winasio {
 namespace http {
@@ -59,14 +63,12 @@ public:
         if (ec.value() == ERROR_HANDLE_EOF) {
           // request finished success
 #ifdef WINASIO_LOG
-          BOOST_LOG_TRIVIAL(debug)
-              << L"async_receive_op ERROR_HANDLE_EOF with len " << len;
+          spdlog::debug("async_receive_op ERROR_HANDLE_EOF with len {}", len);
 #endif
           self.complete(boost::system::error_code{}, len);
         } else if (ec.value() == ERROR_MORE_DATA) {
 #ifdef WINASIO_LOG
-          BOOST_LOG_TRIVIAL(debug)
-              << L"async_receive_op ERROR_MORE_DATA with len " << len;
+          spdlog::debug("async_receive_op ERROR_MORE_DATA with len {}", len);
 #endif
           // resize mutbuff and try again. still in recieving state.
           BOOST_ASSERT_MSG(len > buff_.size(), "len should increase");
@@ -78,8 +80,7 @@ public:
       } else {
         // success
 #ifdef WINASIO_LOG
-        BOOST_LOG_TRIVIAL(debug)
-            << L"async_receive_op NO_ERROR with len " << len;
+        spdlog::debug("async_receive_op NO_ERROR with len {}", len);
 #endif
         // final commit len might be smaller than requested len. Maybe some
         // space was used for intermediate calculation
@@ -139,7 +140,7 @@ public:
       if (ec) {
         if (ec.value() == ERROR_HANDLE_EOF) {
 #ifdef WINASIO_LOG
-          BOOST_LOG_TRIVIAL(debug) << L"async_receive_body_op ERROR_HANDLE_EOF";
+          spdlog::debug("async_receive_body_op ERROR_HANDLE_EOF");
 #endif
           buff_.commit(len);
           self.complete(boost::system::error_code{}, len);
@@ -151,7 +152,7 @@ public:
         // no error, need to call recieve again. still in recieving state.
         buff_.commit(len);
 #ifdef WINASIO_LOG
-        BOOST_LOG_TRIVIAL(debug) << "recieved len " << len;
+        spdlog::debug("recieved len {}", len);
 #endif
         if (len < body_size_hint_) {
           // We use HTTP_RECEIVE_REQUEST_ENTITY_BODY_FLAG_FILL_BUFFER mode.

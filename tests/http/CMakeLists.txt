@@ -18,7 +18,7 @@ foreach(test_file ${SOURCES})
     
     target_compile_definitions(${test_name} PRIVATE WINASIO_LOG) # enable logging
     
-    target_link_libraries(${test_name} PRIVATE Boost::unit_test_framework Boost::disable_autolinking winasio)
+    target_link_libraries(${test_name} PRIVATE Boost::ut winasio spdlog::spdlog)
     set_property(TARGET ${test_name} PROPERTY CXX_STANDARD 20) # for semaphore
     add_test(NAME ${test_name} COMMAND ${test_name} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endforeach()

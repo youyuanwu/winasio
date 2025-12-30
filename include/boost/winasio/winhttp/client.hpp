@@ -10,6 +10,10 @@
 #include "boost/winasio/winhttp/winhttp.hpp"
 #include "boost/winasio/winhttp/winhttp_asio.hpp"
 
+#ifdef WINASIO_LOG
+#include <spdlog/spdlog.h>
+#endif
+
 namespace boost {
 namespace winasio {
 namespace winhttp {
@@ -130,7 +134,7 @@ void async_exec(payload &p, basic_winhttp_connect_handle<Executor> &h_connect,
                          sizeof(dwSecurityFlags), ec);
     if (ec) {
 #ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(debug) << L"set_option for security failed: " << ec;
+      spdlog::debug("set_option for security failed: {}", ec.message());
 #endif
       net::post(h_request.get_executor(), std::bind(token, ec, 0));
       return;

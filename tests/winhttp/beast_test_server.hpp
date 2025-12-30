@@ -31,6 +31,8 @@
 #include <memory>
 #include <string>
 
+#include <spdlog/spdlog.h>
+
 namespace beast = boost::beast;   // from <boost/beast.hpp>
 namespace http = beast::http;     // from <boost/beast/http.hpp>
 namespace net = boost::asio;      // from <boost/asio.hpp>
@@ -85,6 +87,7 @@ private:
 
   // Asynchronously receive a complete request message.
   void read_request() {
+    spdlog::debug("Beast: Start to read request");
     auto self = shared_from_this();
 
     http::async_read(
@@ -215,6 +218,7 @@ private:
 
   // Asynchronously transmit the response message.
   void write_response() {
+    spdlog::debug("Beast: Start to write response");
     auto self = shared_from_this();
 
     response_.content_length(response_.body().size());
@@ -224,6 +228,7 @@ private:
                         self->socket_.shutdown(tcp::socket::shutdown_send, ec);
                         // self->socket_.shutdown(ec);
                         self->deadline_.cancel();
+                        spdlog::debug("Beast: Finished writing response, ec={}", ec.message());
                       });
   }
 

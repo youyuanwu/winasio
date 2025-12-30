@@ -5,8 +5,7 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-// #define BOOST_TEST_MODULE http_client2
-#include <boost/test/unit_test.hpp>
+#include <boost/ut.hpp>
 
 #include "boost/asio.hpp"
 #include "boost/winasio/winhttp/winhttp.hpp"
@@ -17,11 +16,22 @@
 // use beast server for testing
 #include "beast_test_server.hpp"
 
-#include <boost/log/trivial.hpp>
 #include <latch>
 
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
+
+std::string wstring_convert(const std::wstring &wstr) {
+  // TODO: use fmt.
+  if (wstr.empty())
+    return std::string();
+  int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(),
+                                        (int)wstr.size(), NULL, 0, NULL, NULL);
+  std::string result(size_needed, 0);
+  WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), &result[0],
+                      size_needed, NULL, NULL);
+  return result;
+}
 
 class beast_server {
 public:
@@ -38,9 +48,14 @@ public:
     });
     // wait for server to run;
     lch_.wait();
+    spdlog::info("Beast server started");
   }
 
-  ~beast_server() { ioc_.stop(); }
+  ~beast_server() { 
+    ioc_.stop();
+    spdlog::info("Beast server stopped");
+    th_.join();
+  }
 
 private:
   std::latch lch_;
@@ -48,377 +63,382 @@ private:
   std::jthread th_;
 };
 
-BOOST_AUTO_TEST_SUITE(test_winhttp_request)
+boost::ut::suite errors = [] {
+  using namespace boost::ut;
+  spdlog::set_level(spdlog::level::debug);
+  "Basic"_test = [] {
+    spdlog::info("Starting Basic test");
+    beast_server bs;
 
-BOOST_AUTO_TEST_CASE(Basic) {
-  beast_server bs;
+    boost::system::error_code ec;
+    net::io_context io_context;
+    winnet::winhttp::basic_winhttp_session_handle<
+        net::io_context::executor_type>
+        h_session(io_context);
+    h_session.open(ec); // by default async session is created
+    expect(!ec.failed() >> fatal);
 
-  boost::system::error_code ec;
-  net::io_context io_context;
-  winnet::winhttp::basic_winhttp_session_handle<net::io_context::executor_type>
-      h_session(io_context);
-  h_session.open(ec); // by default async session is created
-  BOOST_REQUIRE(!ec.failed());
+    winnet::winhttp::url_component url;
+    url.crack(L"http://localhost:12345/count", ec);
+    expect(!ec.failed() >> fatal);
+    winnet::winhttp::basic_winhttp_connect_handle<
+        net::io_context::executor_type>
+        h_connect(io_context);
+    h_connect.connect(h_session.native_handle(), url.get_hostname().c_str(),
+                      url.get_port(), ec);
+    expect(!ec.failed() >> fatal);
 
-  winnet::winhttp::url_component url;
-  url.crack(L"http://localhost:12345/count", ec);
-  BOOST_REQUIRE(!ec.failed());
+    winnet::winhttp::payload pl;
+    pl.method = L"GET";
+    pl.path = url.get_path();
+    pl.header = std::nullopt;
+    pl.accept = std::nullopt;
+    pl.body = std::nullopt;
+    pl.secure = false;
 
-  winnet::winhttp::basic_winhttp_connect_handle<net::io_context::executor_type>
-      h_connect(io_context);
-  h_connect.connect(h_session.native_handle(), url.get_hostname().c_str(),
-                    url.get_port(), ec);
-  BOOST_REQUIRE(!ec.failed());
+    // test callback style
+    winnet::winhttp::basic_winhttp_request_asio_handle<
+        net::io_context::executor_type>
+        h_request(io_context.get_executor());
 
-  winnet::winhttp::payload pl;
-  pl.method = L"GET";
-  pl.path = url.get_path();
-  pl.header = std::nullopt;
-  pl.accept = std::nullopt;
-  pl.body = std::nullopt;
-  pl.secure = false;
+    std::vector<BYTE> body_buff;
+    auto buff = net::dynamic_buffer(body_buff);
+    winnet::winhttp::async_exec(
+        pl, h_connect, h_request, buff,
+        [&h_request, &buff](boost::system::error_code ec, std::size_t) {
+          spdlog::debug("async_exec handler: status: {}", ec.message());
+          expect(!ec.failed() >> fatal) << "async_exec failed: " << ec.message();
 
-  // test callback style
-  winnet::winhttp::basic_winhttp_request_asio_handle<
-      net::io_context::executor_type>
-      h_request(io_context.get_executor());
+          // print result
+          std::wstring headers;
+          winnet::winhttp::header::get_all_raw_crlf(h_request, ec, headers);
+          expect(!ec.failed() >> fatal);
+          spdlog::debug(L"Headers: {}", headers);
+          spdlog::debug("Body: {}", winnet::winhttp::buff_to_string(buff));
 
-  std::vector<BYTE> body_buff;
-  auto buff = net::dynamic_buffer(body_buff);
-  winnet::winhttp::async_exec(
-      pl, h_connect, h_request, buff,
-      [&h_request, &buff](boost::system::error_code ec, std::size_t) {
-        BOOST_LOG_TRIVIAL(debug) << "async_exec handler";
-        BOOST_REQUIRE(!ec.failed());
+          // more tests
+          // check status
+          DWORD dwStatusCode;
+          winnet::winhttp::header::get_status_code(h_request, ec, dwStatusCode);
+          expect(!ec.failed() >> fatal);
 
-        // print result
-        std::wstring headers;
-        winnet::winhttp::header::get_all_raw_crlf(h_request, ec, headers);
-        BOOST_REQUIRE(!ec.failed());
-        BOOST_LOG_TRIVIAL(debug) << headers;
-        BOOST_LOG_TRIVIAL(debug) << winnet::winhttp::buff_to_string(buff);
+          // sometimes the api is 403, but this does not impact this test.
+          expect(200 == dwStatusCode >> fatal);
 
-        // more tests
-        // check status
-        DWORD dwStatusCode;
-        winnet::winhttp::header::get_status_code(h_request, ec, dwStatusCode);
-        BOOST_REQUIRE_EQUAL(boost::system::errc::success, ec);
+          std::wstring version;
+          winnet::winhttp::header::get_version(h_request, ec, version);
+          expect(!ec.failed() >> fatal);
+          expect(wstring_convert(version) == std::string("HTTP/1.1") >> fatal);
+          std::wstring content_type;
+          winnet::winhttp::header::get_content_type(h_request, ec,
+                                                    content_type);
+          expect(!ec.failed() >> fatal);
+          expect(wstring_convert(content_type) ==
+                 std::string("text/html") >> fatal);
+        });
 
-        // sometimes the api is 403, but this does not impact this test.
-        BOOST_REQUIRE(200 == dwStatusCode);
+    io_context.run();
+  };
 
-        std::wstring version;
-        winnet::winhttp::header::get_version(h_request, ec, version);
-        BOOST_CHECK_EQUAL(boost::system::errc::success, ec);
-        BOOST_CHECK(L"HTTP/1.1" == version);
-        std::wstring content_type;
-        winnet::winhttp::header::get_content_type(h_request, ec, content_type);
-        BOOST_REQUIRE_EQUAL(boost::system::errc::success, ec);
-        BOOST_CHECK(L"text/html" == content_type);
-      });
+  "ObjectHandleAlreadySet"_test = [] {
+    // Tests when event is already set, executor runs the task immediately.
+    net::io_context io_context;
+    net::windows::object_handle oh(io_context);
 
-  io_context.run();
-}
+    HANDLE ev = CreateEvent(NULL,  // default security attributes
+                            TRUE,  // manual-reset event
+                            FALSE, // initial state is nonsignaled
+                            NULL   // object name
+    );
+    expect(ev != nullptr >> fatal);
+    oh.assign(ev);
 
-BOOST_AUTO_TEST_CASE(ObjectHandleAlreadySet) {
-  // Tests when event is already set, executor runs the task immediately.
-  net::io_context io_context;
-  net::windows::object_handle oh(io_context);
+    bool ok = SetEvent(ev);
+    expect(ok >> fatal);
+    bool flag = false;
+    oh.async_wait([&flag](boost::system::error_code ec) {
+      expect(!ec.failed() >> fatal);
+      flag = true;
+    });
 
-  HANDLE ev = CreateEvent(NULL,  // default security attributes
-                          TRUE,  // manual-reset event
-                          FALSE, // initial state is nonsignaled
-                          NULL   // object name
-  );
-  BOOST_REQUIRE(ev != nullptr);
-  oh.assign(ev);
+    io_context.run();
+    expect(flag >> fatal);
 
-  bool ok = SetEvent(ev);
-  BOOST_REQUIRE(ok);
+    io_context.restart();
+    oh.async_wait([&flag](boost::system::error_code ec) {
+      expect(!ec.failed() >> fatal);
+      flag = false;
+    });
+    io_context.run();
+    expect(!flag >> fatal);
+  };
 
-  bool flag = false;
-  oh.async_wait([&flag](boost::system::error_code ec) {
-    BOOST_CHECK(!ec);
-    flag = true;
-  });
+  // "Coroutine"_test = [] {
+  //   spdlog::info("Starting Coroutine test");
+  //   beast_server bs;
 
-  io_context.run();
-  BOOST_CHECK(flag);
+  //   boost::system::error_code ec;
+  //   net::io_context io_context;
+  //   winnet::winhttp::basic_winhttp_session_handle<
+  //       net::io_context::executor_type>
+  //       h_session(io_context);
+  //   h_session.open(ec); // by default async session is created
+  //   expect(!ec.failed() >> fatal);
 
-  io_context.reset();
-  oh.async_wait([&flag](boost::system::error_code ec) {
-    BOOST_CHECK(!ec);
-    flag = false;
-  });
-  io_context.run();
-  BOOST_CHECK(!flag);
-}
+  //   winnet::winhttp::url_component url;
+  //   url.crack(L"http://localhost:12345/count", ec);
+  //   expect(!ec.failed() >> fatal);
+  //   winnet::winhttp::basic_winhttp_connect_handle<
+  //       net::io_context::executor_type>
+  //       h_connect(io_context);
+  //   h_connect.connect(h_session.native_handle(), url.get_hostname().c_str(),
+  //                     url.get_port(), ec);
+  //   expect(!ec.failed() >> fatal);
 
-BOOST_AUTO_TEST_CASE(Coroutine) {
-  beast_server bs;
+  //   // test GET request
+  //   winnet::winhttp::basic_winhttp_request_asio_handle<
+  //       net::io_context::executor_type>
+  //       h_request1(io_context.get_executor());
+  //   {
+  //     std::wstring path = url.get_path();
+  //     h_request1.managed_open(h_connect.native_handle(), L"GET", path.c_str(),
+  //                             NULL, // http 1.1
+  //                             WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+  //                             NULL, // no ssl WINHTTP_FLAG_SECURE,
+  //                             ec);
+  //     expect(!ec.failed() >> fatal);
 
-  boost::system::error_code ec;
-  net::io_context io_context;
-  winnet::winhttp::basic_winhttp_session_handle<net::io_context::executor_type>
-      h_session(io_context);
-  h_session.open(ec); // by default async session is created
-  BOOST_REQUIRE(!ec.failed());
+  //     auto f = [&h_request = h_request1, &url]() -> net::awaitable<void> {
+  //       auto executor = co_await net::this_coro::executor;
+  //       boost::system::error_code ec;
 
-  winnet::winhttp::url_component url;
-  url.crack(L"http://localhost:12345/count", ec);
-  BOOST_REQUIRE(!ec.failed());
+  //       co_await h_request.async_send(
+  //           NULL,                    // headers
+  //           0,                       // header len
+  //           WINHTTP_NO_REQUEST_DATA, // optional
+  //           0,                       // optional len
+  //           0,                       // total len
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
+  //       std::vector<BYTE> body_buff;
+  //       auto dybuff = net::dynamic_buffer(body_buff);
 
-  winnet::winhttp::basic_winhttp_connect_handle<net::io_context::executor_type>
-      h_connect(io_context);
-  h_connect.connect(h_session.native_handle(), url.get_hostname().c_str(),
-                    url.get_port(), ec);
-  BOOST_REQUIRE(!ec.failed());
+  //       co_await h_request.async_recieve_response(
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
+  //       std::size_t len = 0;
+  //       do {
+  //         len = co_await h_request.async_query_data_available(
+  //             net::redirect_error(net::use_awaitable, ec));
+  //         expect(!ec.failed() >> fatal);
+  //         auto buff = dybuff.prepare(len + 1);
+  //         std::size_t read_len = co_await h_request.async_read_data(
+  //             (LPVOID)buff.data(), static_cast<DWORD>(len),
+  //             net::redirect_error(net::use_awaitable, ec));
+  //         expect(!ec.failed() >> fatal);
+  //         expect(read_len == len >> fatal);
+  //         dybuff.commit(len);
+  //       } while (len > 0);
+  //       spdlog::debug("request body:");
+  //       spdlog::debug(winnet::winhttp::buff_to_string(dybuff));
+  //     };
+  //     net::co_spawn(io_context, f, net::detached);
+  //   }
 
-  // test GET request
-  winnet::winhttp::basic_winhttp_request_asio_handle<
-      net::io_context::executor_type>
-      h_request1(io_context.get_executor());
-  {
-    std::wstring path = url.get_path();
-    h_request1.managed_open(h_connect.native_handle(), L"GET", path.c_str(),
-                            NULL, // http 1.1
-                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                            NULL, // no ssl WINHTTP_FLAG_SECURE,
-                            ec);
-    BOOST_REQUIRE(!ec);
+  //   // test POST request
+  //   winnet::winhttp::basic_winhttp_request_asio_handle<
+  //       net::io_context::executor_type>
+  //       h_request2(io_context.get_executor());
+  //   {
+  //     std::wstring path = url.get_path();
+  //     h_request2.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
+  //                             NULL, // http 1.1
+  //                             WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+  //                             NULL, // no ssl WINHTTP_FLAG_SECURE,
+  //                             ec);
+  //     expect(!ec.failed() >> fatal);
 
-    auto f = [&h_request = h_request1, &url]() -> net::awaitable<void> {
-      auto executor = co_await net::this_coro::executor;
-      boost::system::error_code ec;
+  //     auto f = [&h_request2, &url]() -> net::awaitable<void> {
+  //       auto executor = co_await net::this_coro::executor;
+  //       boost::system::error_code ec;
 
-      co_await h_request.async_send(
-          NULL,                    // headers
-          0,                       // header len
-          WINHTTP_NO_REQUEST_DATA, // optional
-          0,                       // optional len
-          0,                       // total len
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-      std::vector<BYTE> body_buff;
-      auto dybuff = net::dynamic_buffer(body_buff);
+  //       std::string req_body = "set_count=100";
+  //       const DWORD req_len = static_cast<DWORD>(req_body.size());
+  //       co_await h_request2.async_send(
+  //           NULL,    // headers
+  //           0,       // header len
+  //           NULL,    // optional
+  //           0,       // optional len
+  //           req_len, // total len
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
+  //       std::size_t total_write_len = {};
+  //       std::size_t index = {};
+  //       std::size_t remain_len = req_len;
+  //       while (total_write_len < req_len) {
+  //         char *c = req_body.data() + index;
+  //         std::size_t write_len = co_await h_request2.async_write_data(
+  //             (LPCVOID)c, static_cast<DWORD>(remain_len),
+  //             net::redirect_error(net::use_awaitable, ec));
+  //         expect(!ec.failed() >> fatal);
+  //         total_write_len += write_len;
+  //         index += write_len;
+  //         remain_len -= write_len;
+  //         // This is not necessary the case since winhttp might not gurantee
+  //         // that write len equals provided buffer len. If test fail here, we
+  //         // can remove this check.
+  //         expect(req_len == write_len >> fatal);
+  //       }
+  //       expect(req_len == total_write_len >> fatal);
 
-      co_await h_request.async_recieve_response(
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-      std::size_t len = 0;
-      do {
-        len = co_await h_request.async_query_data_available(
-            net::redirect_error(net::use_awaitable, ec));
-        BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-        auto buff = dybuff.prepare(len + 1);
-        std::size_t read_len = co_await h_request.async_read_data(
-            (LPVOID)buff.data(), static_cast<DWORD>(len),
-            net::redirect_error(net::use_awaitable, ec));
-        BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-        BOOST_REQUIRE_EQUAL(read_len, len);
-        dybuff.commit(len);
-      } while (len > 0);
-      BOOST_TEST_MESSAGE("request body:");
-      BOOST_TEST_MESSAGE(winnet::winhttp::buff_to_string(dybuff));
-    };
-    net::co_spawn(io_context, f, net::detached);
-  }
+  //       std::vector<BYTE> body_buff;
+  //       auto dybuff = net::dynamic_buffer(body_buff);
 
-  // test POST request
-  winnet::winhttp::basic_winhttp_request_asio_handle<
-      net::io_context::executor_type>
-      h_request2(io_context.get_executor());
-  {
-    std::wstring path = url.get_path();
-    h_request2.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
-                            NULL, // http 1.1
-                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                            NULL, // no ssl WINHTTP_FLAG_SECURE,
-                            ec);
-    BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
+  //       co_await h_request2.async_recieve_response(
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
+  //       std::size_t len = 0;
+  //       do {
+  //         len = co_await h_request2.async_query_data_available(
+  //             net::redirect_error(net::use_awaitable, ec));
+  //         expect(!ec.failed() >> fatal);
+  //         auto buff = dybuff.prepare(len + 1);
+  //         std::size_t read_len = co_await h_request2.async_read_data(
+  //             (LPVOID)buff.data(), static_cast<DWORD>(len),
+  //             net::redirect_error(net::use_awaitable, ec));
+  //         expect(!ec.failed() >> fatal);
+  //         expect(read_len == len >> fatal);
+  //         dybuff.commit(len);
+  //       } while (len > 0);
+  //       spdlog::debug("request body:");
+  //       spdlog::debug(winnet::winhttp::buff_to_string(dybuff));
+  //     };
+  //     net::co_spawn(io_context, f, net::detached);
+  //   }
 
-    auto f = [&h_request2, &url]() -> net::awaitable<void> {
-      auto executor = co_await net::this_coro::executor;
-      boost::system::error_code ec;
+  //   // stress test async by read and write one byte at a time.
+  //   winnet::winhttp::basic_winhttp_request_asio_handle<
+  //       net::io_context::executor_type>
+  //       h_request3(io_context.get_executor());
+  //   {
+  //     std::wstring path = url.get_path();
+  //     h_request3.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
+  //                             NULL, // http 1.1
+  //                             WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+  //                             NULL, // no ssl WINHTTP_FLAG_SECURE,
+  //                             ec);
+  //     expect(!ec.failed() >> fatal);
 
-      std::string req_body = "set_count=100";
-      const DWORD req_len = static_cast<DWORD>(req_body.size());
-      co_await h_request2.async_send(
-          NULL,    // headers
-          0,       // header len
-          NULL,    // optional
-          0,       // optional len
-          req_len, // total len
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-      std::size_t total_write_len = {};
-      std::size_t index = {};
-      std::size_t remain_len = req_len;
-      while (total_write_len < req_len) {
-        char *c = req_body.data() + index;
-        std::size_t write_len = co_await h_request2.async_write_data(
-            (LPCVOID)c, static_cast<DWORD>(remain_len),
-            net::redirect_error(net::use_awaitable, ec));
-        BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-        total_write_len += write_len;
-        index += write_len;
-        remain_len -= write_len;
-        // This is not necessary the case since winhttp might not gurantee
-        // that write len equals provided buffer len. If test fail here, we
-        // can remove this check.
-        BOOST_REQUIRE_EQUAL(req_len, write_len);
-      }
-      BOOST_REQUIRE_EQUAL(req_len, total_write_len);
+  //     auto f = [&h_request = h_request3, &url]() -> net::awaitable<void> {
+  //       auto executor = co_await net::this_coro::executor;
+  //       boost::system::error_code ec;
+  //       std::string req_body = "set_count=111";
+  //       const DWORD req_len = static_cast<DWORD>(req_body.size());
+  //       co_await h_request.async_send(
+  //           NULL,    // headers
+  //           0,       // header len
+  //           NULL,    // optional
+  //           0,       // optional len
+  //           req_len, // total len
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
 
-      std::vector<BYTE> body_buff;
-      auto dybuff = net::dynamic_buffer(body_buff);
+  //       // write data byte by byte to stress test
+  //       std::size_t total_write_len = {};
+  //       std::size_t index = {};
+  //       const DWORD step_size = 1;
+  //       while (total_write_len < req_len) {
+  //         char *c = req_body.data() + index;
+  //         std::size_t write_len = co_await h_request.async_write_data(
+  //             (LPCVOID)c, step_size,
+  //             net::redirect_error(net::use_awaitable, ec));
+  //         expect(!ec.failed() >> fatal);
+  //         total_write_len += write_len;
+  //         index += write_len;
+  //       }
+  //       expect(req_len == total_write_len >> fatal);
+  //       co_await h_request.async_recieve_response(
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
 
-      co_await h_request2.async_recieve_response(
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-      std::size_t len = 0;
-      do {
-        len = co_await h_request2.async_query_data_available(
-            net::redirect_error(net::use_awaitable, ec));
-        BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-        auto buff = dybuff.prepare(len + 1);
-        std::size_t read_len = co_await h_request2.async_read_data(
-            (LPVOID)buff.data(), static_cast<DWORD>(len),
-            net::redirect_error(net::use_awaitable, ec));
-        BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-        BOOST_REQUIRE_EQUAL(read_len, len);
-        dybuff.commit(len);
-      } while (len > 0);
-      BOOST_TEST_MESSAGE("request body:");
-      BOOST_TEST_MESSAGE(winnet::winhttp::buff_to_string(dybuff));
-    };
-    net::co_spawn(io_context, f, net::detached);
-  }
+  //       DWORD dwStatusCode = {};
+  //       winnet::winhttp::header::get_status_code(h_request, ec, dwStatusCode);
+  //       expect(!ec.failed() >> fatal);
+  //       expect(static_cast<DWORD>(201) == dwStatusCode >> fatal);
 
-  // stress test async by read and write one byte at a time.
-  winnet::winhttp::basic_winhttp_request_asio_handle<
-      net::io_context::executor_type>
-      h_request3(io_context.get_executor());
-  {
-    std::wstring path = url.get_path();
-    h_request3.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
-                            NULL, // http 1.1
-                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                            NULL, // no ssl WINHTTP_FLAG_SECURE,
-                            ec);
-    BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
+  //       // read bytes one by one
+  //       std::size_t total_read = {};
+  //       std::string body = {};
+  //       while (true) {
+  //         std::size_t len = co_await h_request.async_query_data_available(
+  //             net::redirect_error(net::use_awaitable, ec));
+  //         expect(!ec.failed() >> fatal);
+  //         if (len == 0) {
+  //           break;
+  //         }
+  //         char c = {};
+  //         std::size_t read_len = co_await h_request.async_read_data(
+  //             (LPVOID)&c, 1, net::redirect_error(net::use_awaitable, ec));
+  //         expect(!ec.failed() >> fatal);
+  //         total_read += read_len;
+  //         body += c;
+  //       }
+  //       expect(total_read == body.size() >> fatal);
+  //       spdlog::debug("request body:");
+  //       spdlog::debug(body);
+  //     };
+  //     net::co_spawn(io_context, f, net::detached);
+  //   }
 
-    auto f = [&h_request = h_request3, &url]() -> net::awaitable<void> {
-      auto executor = co_await net::this_coro::executor;
-      boost::system::error_code ec;
-      std::string req_body = "set_count=111";
-      const DWORD req_len = static_cast<DWORD>(req_body.size());
-      co_await h_request.async_send(
-          NULL,    // headers
-          0,       // header len
-          NULL,    // optional
-          0,       // optional len
-          req_len, // total len
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
+  //   // test using stream
+  //   winnet::winhttp::basic_winhttp_request_stream_handle<
+  //       net::io_context::executor_type>
+  //       h_stream(io_context.get_executor());
+  //   {
+  //     std::wstring path = url.get_path();
+  //     h_stream.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
+  //                           NULL, // http 1.1
+  //                           WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+  //                           NULL, // no ssl WINHTTP_FLAG_SECURE,
+  //                           ec);
+  //     expect(ec == boost::system::errc::success >> fatal);
 
-      // write data byte by byte to stress test
-      std::size_t total_write_len = {};
-      std::size_t index = {};
-      const DWORD step_size = 1;
-      while (total_write_len < req_len) {
-        char *c = req_body.data() + index;
-        std::size_t write_len = co_await h_request.async_write_data(
-            (LPCVOID)c, step_size, net::redirect_error(net::use_awaitable, ec));
-        BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-        total_write_len += write_len;
-        index += write_len;
-      }
-      BOOST_REQUIRE_EQUAL(req_len, total_write_len);
+  //     auto f = [&h_request = h_stream, &url]() -> net::awaitable<void> {
+  //       auto executor = co_await net::this_coro::executor;
+  //       boost::system::error_code ec;
+  //       std::string req_body = "set_count=200";
+  //       DWORD req_len = static_cast<DWORD>(req_body.size());
+  //       co_await h_request.async_send(
+  //           NULL,                                // headers
+  //           0,                                   // header len
+  //           NULL,                                // optional
+  //           0,                                   // optional len
+  //           static_cast<DWORD>(req_body.size()), // total len
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
 
-      co_await h_request.async_recieve_response(
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
+  //       std::size_t write_len = co_await net::async_write(
+  //           h_request, net::buffer(req_body),
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
 
-      DWORD dwStatusCode = {};
-      winnet::winhttp::header::get_status_code(h_request, ec, dwStatusCode);
-      BOOST_CHECK_EQUAL(boost::system::errc::success, ec);
-      BOOST_CHECK_EQUAL(static_cast<DWORD>(201), dwStatusCode);
+  //       expect(req_len == write_len >> fatal);
 
-      // read bytes one by one
-      std::size_t total_read = {};
-      std::string body = {};
-      while (true) {
-        std::size_t len = co_await h_request.async_query_data_available(
-            net::redirect_error(net::use_awaitable, ec));
-        BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-        if (len == 0) {
-          break;
-        }
-        char c = {};
-        std::size_t read_len = co_await h_request.async_read_data(
-            (LPVOID)&c, 1, net::redirect_error(net::use_awaitable, ec));
-        BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-        total_read += read_len;
-        body += c;
-      }
-      BOOST_CHECK_EQUAL(total_read, body.size());
+  //       co_await h_request.async_recieve_response(
+  //           net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
+  //       std::vector<BYTE> body_buff;
+  //       co_await net::async_read(h_request, net::dynamic_buffer(body_buff),
+  //                                net::redirect_error(net::use_awaitable, ec));
+  //       expect(!ec.failed() >> fatal);
+  //       spdlog::debug("request body:");
+  //       spdlog::debug(std::string(body_buff.begin(), body_buff.end()));
+  //     };
+  //     net::co_spawn(io_context, f, net::detached);
+  //   }
 
-      BOOST_TEST_MESSAGE("request body:");
-      BOOST_TEST_MESSAGE(body);
-    };
-    net::co_spawn(io_context, f, net::detached);
-  }
+  //   io_context.run();
+  // };
+};
 
-  // test using stream
-  winnet::winhttp::basic_winhttp_request_stream_handle<
-      net::io_context::executor_type>
-      h_stream(io_context.get_executor());
-  {
-    std::wstring path = url.get_path();
-    h_stream.managed_open(h_connect.native_handle(), L"POST", path.c_str(),
-                          NULL, // http 1.1
-                          WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                          NULL, // no ssl WINHTTP_FLAG_SECURE,
-                          ec);
-    BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-
-    auto f = [&h_request = h_stream, &url]() -> net::awaitable<void> {
-      auto executor = co_await net::this_coro::executor;
-      boost::system::error_code ec;
-      std::string req_body = "set_count=200";
-      DWORD req_len = static_cast<DWORD>(req_body.size());
-      co_await h_request.async_send(
-          NULL,                                // headers
-          0,                                   // header len
-          NULL,                                // optional
-          0,                                   // optional len
-          static_cast<DWORD>(req_body.size()), // total len
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-
-      std::size_t write_len = co_await net::async_write(
-          h_request, net::buffer(req_body),
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-
-      BOOST_REQUIRE_EQUAL(req_len, write_len);
-
-      co_await h_request.async_recieve_response(
-          net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-
-      std::vector<BYTE> body_buff;
-      co_await net::async_read(h_request, net::dynamic_buffer(body_buff),
-                               net::redirect_error(net::use_awaitable, ec));
-      BOOST_REQUIRE_EQUAL(ec, boost::system::errc::success);
-      BOOST_TEST_MESSAGE("request body:");
-      BOOST_TEST_MESSAGE(std::string(body_buff.begin(), body_buff.end()));
-    };
-    net::co_spawn(io_context, f, net::detached);
-  }
-
-  io_context.run();
-}
-
-BOOST_AUTO_TEST_SUITE_END()
+int main() {}

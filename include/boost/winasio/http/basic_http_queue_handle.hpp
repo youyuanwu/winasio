@@ -19,7 +19,7 @@
 #include <boost/asio/windows/overlapped_ptr.hpp>
 
 #ifdef WINASIO_LOG
-#include <boost/log/trivial.hpp>
+#include <spdlog/spdlog.h>
 #endif
 
 #include <iostream>
@@ -94,8 +94,7 @@ public:
       BOOST_ASIO_MOVE_ARG(ReadHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug)
-        << L"async_recieve_request buff len " << RequestBufferLength;
+    spdlog::debug("async_recieve_request buff len {}", RequestBufferLength);
 #endif
     boost::asio::windows::overlapped_ptr optr(this->get_executor(),
                                               std::move(handler));
@@ -111,7 +110,7 @@ public:
 
     if (result == NO_ERROR) {
 #ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(debug) << L"async_recieve_request is synchronous";
+      spdlog::debug("async_recieve_request is synchronous");
 #endif
       // TODO: investigate if this should be a release() or complete().
       // This needs future testing. If iocp is corrupted, this might be the
@@ -148,8 +147,7 @@ public:
       BOOST_ASIO_MOVE_ARG(ReadHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug)
-        << L"async_recieve_body buff len " << EntityBufferLength;
+    spdlog::debug("async_recieve_body buff len {}", EntityBufferLength);
 #endif
     boost::asio::windows::overlapped_ptr optr(this->get_executor(),
                                               std::move(handler));
@@ -184,7 +182,7 @@ public:
       BOOST_ASIO_MOVE_ARG(WriteHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << "async_send_response";
+    spdlog::debug("async_send_response");
 #endif
     boost::asio::windows::overlapped_ptr optr(this->get_executor(), handler);
     DWORD result = HttpSendHttpResponse(
@@ -218,7 +216,7 @@ public:
   void send_response(PHTTP_RESPONSE resp, HTTP_REQUEST_ID requestId,
                      ULONG flags, boost::system::error_code &ec) {
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << "send_response";
+    spdlog::debug("send_response");
 #endif
     ULONG bytesSent;
     DWORD result = HttpSendHttpResponse(

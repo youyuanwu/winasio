@@ -12,6 +12,10 @@
 #include "boost/winasio/winhttp/winhttp.hpp"
 #include <functional>
 
+#ifdef WINASIO_LOG
+#include <spdlog/spdlog.h>
+#endif
+
 namespace boost {
 namespace winasio {
 namespace winhttp {
@@ -200,7 +204,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     DWORD data_len = *((LPDWORD)lpvStatusInformation);
 
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << L"DATA_AVAILABLE " << data_len;
+    spdlog::debug("DATA_AVAILABLE {}", data_len);
 #endif
 
     // call back needs to finish request if len is 0
@@ -211,8 +215,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     // The response header has been received and is available with
     // WinHttpQueryHeaders. The lpvStatusInformation parameter is NULL.
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug)
-        << L"HEADERS_AVAILABLE " << dwStatusInformationLength;
+    spdlog::debug("HEADERS_AVAILABLE {}", dwStatusInformationLength);
 #endif
     // Begin downloading the resource.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::headers_available);
@@ -228,8 +231,8 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     // dwStatusInformationLength
     // parameter indicates the size of lpvStatusInformation.
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug)
-        << "READ_COMPLETE Number of bytes read " << dwStatusInformationLength;
+    spdlog::debug("READ_COMPLETE Number of bytes read {}",
+                  dwStatusInformationLength);
 #endif
     // Copy the data and delete the buffers.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::read_complete);
@@ -237,8 +240,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     break;
   case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE:
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug)
-        << L"SENDREQUEST_COMPLETE " << dwStatusInformationLength;
+    spdlog::debug("SENDREQUEST_COMPLETE {}", dwStatusInformationLength);
 #endif
     // Prepare the request handle to receive a response.
     BOOST_ASSERT(cpContext->get_state() == ctx_state_type::send_request);
@@ -249,7 +251,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     BOOST_ASSERT(dwStatusInformationLength == sizeof(DWORD));
     DWORD data_len = *((LPDWORD)lpvStatusInformation);
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << L"WRITE_COMPLETE len: " << data_len;
+    spdlog::debug("WRITE_COMPLETE len: {}", data_len);
 #endif
     cpContext->step_complete(ec, data_len);
   } break;
@@ -258,7 +260,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     std::wstring err;
     winnet::winhttp::error::get_api_error_str(pAR, err);
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << "winhttp callback error: " << err;
+    spdlog::debug(L"winhttp callback error: {}", err);
 #endif
     ec.assign(pAR->dwError, boost::asio::error::get_system_category());
     BOOST_ASSERT(ec.failed()); // ec must be failed.
@@ -286,8 +288,8 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
     default:
       // API_GET_PROXY_FOR_URL is not used.
 #ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(debug)
-          << "winhttp callback error unknown state num: " << pAR->dwResult;
+      spdlog::debug("winhttp callback error unknown state num: {}",
+                    pAR->dwResult);
 #endif
       BOOST_ASSERT_MSG(false, "Unknown error winhttp callback error state" +
                                   pAR->dwResult);
@@ -295,8 +297,8 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
   } break;
   default:
 #ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << L"Unknown/unhandled callback - status "
-                             << dwInternetStatus << L"given";
+    spdlog::debug("Unknown/unhandled callback - status {} given",
+                  dwInternetStatus);
 #endif
     BOOST_ASSERT_MSG(false, "dwInternetStatus unknown.");
     break;
@@ -518,7 +520,7 @@ public:
         h_request_.async_query_data_available(std::move(self));
       } else {
 #ifdef WINASIO_LOG
-        BOOST_LOG_TRIVIAL(debug) << L"state::read_data complete";
+        spdlog::debug("state::read_data complete");
 #endif
         state_ = state::done;
         self.complete(ec, 0); // TODO total len;

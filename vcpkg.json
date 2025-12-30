@@ -4,8 +4,11 @@
   "version": "0.0.1",
   "dependencies": [
     "boost-asio",
-    "boost-log",
-    "boost-test",
-    "boost-beast"
+    "boost-beast",
+    "bext-ut",
+    {
+      "name": "spdlog",
+      "features": ["wchar"]
+    }
   ]
 }
