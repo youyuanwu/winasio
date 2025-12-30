@@ -33,7 +33,7 @@ endif(${winasio_MAIN_PROJECT})
 
 set(Boost_USE_STATIC_LIBS ON) # use static boost
 set(Boost_NO_WARN_NEW_VERSIONS ON)
-find_package(Boost REQUIRED COMPONENTS unit_test_framework headers)
+find_package(Boost REQUIRED COMPONENTS headers)
 find_package(spdlog CONFIG REQUIRED)
 find_package(ut CONFIG REQUIRED)
 

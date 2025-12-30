@@ -179,6 +179,7 @@ void __stdcall BasicAsioAsyncCallback(HINTERNET hInternet, DWORD_PTR dwContext,
                                       DWORD dwInternetStatus,
                                       LPVOID lpvStatusInformation,
                                       DWORD dwStatusInformationLength) {
+  spdlog::debug("BasicAsioAsyncCallback ENTERED: status={}", dwInternetStatus);
   UNREFERENCED_PARAMETER(hInternet);
   typedef asio_request_context<Executor>::state ctx_state_type;
   asio_request_context<Executor> *cpContext;
