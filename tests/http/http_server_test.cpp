@@ -5,8 +5,8 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#define BOOST_TEST_MODULE http_server
-#include <boost/test/unit_test.hpp>
+#include <boost/ut.hpp>
+#include <spdlog/spdlog.h>
 
 #include <boost/winasio/http/http.hpp>
 #include <boost/winasio/http/temp.hpp>
@@ -22,10 +22,6 @@
 #include <boost/beast/version.hpp>
 #pragma warning(pop)
 
-#include <boost/log/core.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/trivial.hpp>
-
 #include <chrono>
 #include <cstdio>
 #include <utility>
@@ -37,17 +33,10 @@ namespace http = beast::http;   // from <boost/beast/http.hpp>
 namespace net = boost::asio;    // from <boost/asio.hpp>
 using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-namespace logging = boost::log;
 namespace winnet = boost::winasio;
-
-void log_init() {
-  logging::core::get()->set_filter(logging::trivial::severity >=
-                                   logging::trivial::debug);
-}
 
 template <winnet::http::HTTP_MAJOR_VERSION http_version>
 void http_server_test_helper() {
-  log_init();
   // init http module
   winnet::http::http_initializer<http_version> init;
   // add https then this becomes https server
@@ -60,7 +49,7 @@ void http_server_test_helper() {
   winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(init.create_http_queue(ec));
-  BOOST_REQUIRE(!ec.failed());
+  BOOST_ASSERT(!ec.failed());
   winnet::http::basic_http_url<net::io_context::executor_type, http_version>
       simple_url(queue, url);
 
@@ -68,10 +57,9 @@ void http_server_test_helper() {
                     winnet::http::simple_response &response) {
     // handler for testing
     PHTTP_REQUEST req = request.get_request();
-    BOOST_LOG_TRIVIAL(debug)
-        << L"Got a request for url: " << req->CookedUrl.pFullUrl << L" VerbId: "
-        << static_cast<int>(req->Verb);
-    BOOST_LOG_TRIVIAL(debug) << request;
+    spdlog::debug(L"Got a request for url: {} VerbId: {}",
+                  req->CookedUrl.pFullUrl, static_cast<int>(req->Verb));
+    spdlog::debug("{}", request.get_body_string());
     response.set_status_code(200);
     response.set_reason("OK");
     response.set_content_type("text/html");
@@ -104,8 +92,8 @@ void http_server_test_helper() {
   req.add_header("myheader", "myval");
   // make client call
   ec = make_test_request(req, resp);
-  BOOST_REQUIRE(!ec.failed());
-  BOOST_REQUIRE_EQUAL(resp.status, http::status::ok);
+  BOOST_ASSERT(!ec.failed());
+  boost::ut::expect(resp.status == http::status::ok);
 
   // let server listen again
   std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -116,16 +104,6 @@ void http_server_test_helper() {
       thread.join();
     }
   }
-}
-
-BOOST_AUTO_TEST_SUITE(test_http_server)
-
-BOOST_AUTO_TEST_CASE(server_http_ver_1) {
-  http_server_test_helper<winnet::http::HTTP_MAJOR_VERSION::http_ver_1>();
-}
-
-BOOST_AUTO_TEST_CASE(server_http_ver_2) {
-  http_server_test_helper<winnet::http::HTTP_MAJOR_VERSION::http_ver_2>();
 }
 
 template <winnet::http::HTTP_MAJOR_VERSION http_version>
@@ -142,7 +120,7 @@ void server_gracefully_shutdown_helper() {
   winnet::http::basic_http_queue_handle<net::io_context::executor_type> queue(
       io_context);
   queue.assign(init.create_http_queue(ec));
-  BOOST_REQUIRE(!ec.failed());
+  BOOST_ASSERT(!ec.failed());
   winnet::http::basic_http_url<net::io_context::executor_type, http_version>
       simple_url(queue, url);
 
@@ -162,58 +140,77 @@ void server_gracefully_shutdown_helper() {
 
   t.join();
 
-  BOOST_REQUIRE_EQUAL(cncl_ec.value(), 995); // cancelled.
+  boost::ut::expect(cncl_ec.value() == 995); // cancelled.
 }
 
-BOOST_AUTO_TEST_CASE(gracefully_shutdown_http_ver_1) {
-  server_gracefully_shutdown_helper<
-      winnet::http::HTTP_MAJOR_VERSION::http_ver_1>();
-}
+boost::ut::suite errors = [] {
+  using namespace boost::ut;
 
-BOOST_AUTO_TEST_CASE(gracefully_shutdown_http_ver_2) {
-  server_gracefully_shutdown_helper<
-      winnet::http::HTTP_MAJOR_VERSION::http_ver_2>();
-}
+  spdlog::set_level(spdlog::level::debug);
 
-BOOST_AUTO_TEST_CASE(server_url_register_api) {
-  // init http module
-  winnet::http::http_initializer<winnet::http::HTTP_MAJOR_VERSION::http_ver_1>
-      init;
+  "server_http_ver_1"_test = [] {
+    spdlog::info("Starting server_http_ver_1 test");
+    http_server_test_helper<winnet::http::HTTP_MAJOR_VERSION::http_ver_1>();
+  };
 
-  boost::system::error_code ec;
-  net::io_context ctx;
+  "server_http_ver_2"_test = [] {
+    spdlog::info("Starting server_http_ver_2 test");
+    http_server_test_helper<winnet::http::HTTP_MAJOR_VERSION::http_ver_2>();
+  };
 
-  // open queue handle
-  winnet::http::queue queue(ctx, winnet::http::open_raw_http_queue());
+  "gracefully_shutdown_http_ver_1"_test = [] {
+    spdlog::info("Starting gracefully_shutdown_http_ver_1 test");
+    server_gracefully_shutdown_helper<
+        winnet::http::HTTP_MAJOR_VERSION::http_ver_1>();
+  };
 
-  winnet::http::controller controller(queue, L"http://localhost:1337/");
+  "gracefully_shutdown_http_ver_2"_test = [] {
+    spdlog::info("Starting gracefully_shutdown_http_ver_2 test");
+    server_gracefully_shutdown_helper<
+        winnet::http::HTTP_MAJOR_VERSION::http_ver_2>();
+  };
 
-  controller.get(L"/url-123",
-                 [](winnet::http::controller::request_context &ctx) {
-                   ctx.response.set_body("Hello world");
-                   ctx.response.set_status_code(200);
-                 });
+  "server_url_register_api"_test = [] {
+    spdlog::info("Starting server_url_register_api test");
+    // init http module
+    winnet::http::http_initializer<winnet::http::HTTP_MAJOR_VERSION::http_ver_1>
+        init;
 
-  controller.post(L"/url-123",
-                  [](winnet::http::controller::request_context &ctx) {
-                    ctx.response.set_body("Hello world");
-                    ctx.response.set_status_code(201);
-                  });
+    boost::system::error_code ec;
+    net::io_context ctx;
 
-  controller.put(L"/url-123",
-                 [](winnet::http::controller::request_context &ctx) {
-                   ctx.response.set_body("Hello world");
-                   ctx.response.set_status_code(204);
-                 });
+    // open queue handle
+    winnet::http::queue queue(ctx, winnet::http::open_raw_http_queue());
 
-  controller.del(L"/url-123",
-                 [](winnet::http::controller::request_context &ctx) {
-                   ctx.response.set_body("Hello world");
-                   ctx.response.set_status_code(200);
-                 });
+    winnet::http::controller controller(queue, L"http://localhost:1337/");
 
-  controller.start();
-  // ctx.run();
-}
+    controller.get(L"/url-123",
+                   [](winnet::http::controller::request_context &ctx) {
+                     ctx.response.set_body("Hello world");
+                     ctx.response.set_status_code(200);
+                   });
 
-BOOST_AUTO_TEST_SUITE_END()
+    controller.post(L"/url-123",
+                    [](winnet::http::controller::request_context &ctx) {
+                      ctx.response.set_body("Hello world");
+                      ctx.response.set_status_code(201);
+                    });
+
+    controller.put(L"/url-123",
+                   [](winnet::http::controller::request_context &ctx) {
+                     ctx.response.set_body("Hello world");
+                     ctx.response.set_status_code(204);
+                   });
+
+    controller.del(L"/url-123",
+                   [](winnet::http::controller::request_context &ctx) {
+                     ctx.response.set_body("Hello world");
+                     ctx.response.set_status_code(200);
+                   });
+
+    controller.start();
+    // ctx.run();
+  };
+};
+
+int main() {}

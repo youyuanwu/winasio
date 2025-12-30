@@ -33,7 +33,9 @@ endif(${winasio_MAIN_PROJECT})
 
 set(Boost_USE_STATIC_LIBS ON) # use static boost
 set(Boost_NO_WARN_NEW_VERSIONS ON)
-find_package(Boost REQUIRED COMPONENTS log) # log is used for tests
+find_package(Boost REQUIRED COMPONENTS log unit_test_framework headers)
+find_package(spdlog CONFIG REQUIRED)
+find_package(ut CONFIG REQUIRED)
 
 file(GLOB_RECURSE WINASIO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
 
@@ -55,7 +57,8 @@ target_compile_options(winasio
 
 # currently winasio uses boost log for logging
 target_link_libraries(winasio
-    INTERFACE Boost::log Boost::disable_autolinking Boost::headers
+    INTERFACE Boost::headers
+    INTERFACE spdlog::spdlog
 )
 
 if(winasio_BuildExamples)

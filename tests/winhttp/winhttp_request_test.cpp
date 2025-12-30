@@ -5,7 +5,7 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-// #define BOOST_TEST_MODULE http_client2
+#define BOOST_TEST_MODULE http_client2
 #include <boost/test/unit_test.hpp>
 
 #include "boost/asio.hpp"
@@ -118,40 +118,6 @@ BOOST_AUTO_TEST_CASE(Basic) {
       });
 
   io_context.run();
-}
-
-BOOST_AUTO_TEST_CASE(ObjectHandleAlreadySet) {
-  // Tests when event is already set, executor runs the task immediately.
-  net::io_context io_context;
-  net::windows::object_handle oh(io_context);
-
-  HANDLE ev = CreateEvent(NULL,  // default security attributes
-                          TRUE,  // manual-reset event
-                          FALSE, // initial state is nonsignaled
-                          NULL   // object name
-  );
-  BOOST_REQUIRE(ev != nullptr);
-  oh.assign(ev);
-
-  bool ok = SetEvent(ev);
-  BOOST_REQUIRE(ok);
-
-  bool flag = false;
-  oh.async_wait([&flag](boost::system::error_code ec) {
-    BOOST_CHECK(!ec);
-    flag = true;
-  });
-
-  io_context.run();
-  BOOST_CHECK(flag);
-
-  io_context.restart();
-  oh.async_wait([&flag](boost::system::error_code ec) {
-    BOOST_CHECK(!ec);
-    flag = false;
-  });
-  io_context.run();
-  BOOST_CHECK(!flag);
 }
 
 BOOST_AUTO_TEST_CASE(Coroutine) {

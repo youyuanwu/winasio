@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <spdlog/spdlog.h>
 #include <utility>
 
 // Used as example and testing
@@ -26,16 +27,16 @@ public:
 
 private:
   void do_accept() {
-    std::cout << "do_accept" << std::endl;
+    spdlog::debug("do_accept");
     acceptor_.async_accept(
         [this](boost::system::error_code ec,
                winnet::named_pipe_protocol<net::io_context::executor_type>::pipe
                    socket) {
           if (!ec) {
-            std::cout << "do_accept handler ok. making session" << std::endl;
+            spdlog::debug("do_accept handler ok. making session");
             std::make_shared<session>(std::move(socket))->start();
           } else {
-            std::cout << "accept handler error: " << ec.message() << std::endl;
+            spdlog::error("accept handler error: {}", ec.message());
           }
 
           do_accept();

@@ -9,6 +9,7 @@
 
 #include "boost/winasio/named_pipe/named_pipe_protocol.hpp"
 #include "echoserver_session.hpp"
+#include <spdlog/spdlog.h>
 
 namespace net = boost::asio;
 
@@ -23,9 +24,9 @@ public:
 
 private:
   void do_accept() {
-    std::cout << "do_accept" << std::endl;
+    spdlog::debug("do_accept");
     acceptor_.async_accept(pipe_, [this](boost::system::error_code ec) {
-      std::cout << "do_accept handler" << std::endl;
+      spdlog::debug("do_accept handler");
       if (!ec) {
         std::make_shared<session>(std::move(pipe_))->start();
       }

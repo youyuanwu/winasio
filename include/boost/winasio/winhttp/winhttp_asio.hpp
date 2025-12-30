@@ -135,6 +135,11 @@ public:
   // This sets the event so that asio handler/token gets run,
   // and ec value will be accessable in handler.
   void step_complete(boost::system::error_code ec, std::size_t len = 0) {
+#ifdef WINASIO_LOG
+    BOOST_LOG_TRIVIAL(debug)
+        << "step_complete: state=" << static_cast<int>(state_) << " ec=" << ec
+        << " len=" << len;
+#endif
     // remembers the error and then set the event
     this->step_ec = ec;
     this->step_len = len;
