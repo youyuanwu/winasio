@@ -80,7 +80,7 @@ template <typename Server> void test_server() {
     }
   }
 
-  io_context.reset();
+  io_context.restart();
 }
 
 BOOST_AUTO_TEST_SUITE(test_named_pipe)

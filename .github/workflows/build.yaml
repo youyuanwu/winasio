@@ -6,22 +6,29 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         BUILD_TYPE: ["Debug", "Release"]
         os: [ windows-latest ]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v5
 
-    - name: Get MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-
-    - name: Get specific version CMake, v3.21.2
-      uses: lukka/get-cmake@v3.21.2
+    - name: Check cmake version
+      run: cmake --version
     
     - name: Setup vcpkg (it does not install any package yet)
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgGitCommitId: 01f602195983451bc83e72f4214af2cbc495aa94
+        vcpkgGitCommitId: 84bab45d415d22042bd0b9081aea57f362da3f35 # 2025.12.12
+    
+    - name: Set up vcpkg binary cache
+      if: runner.os == 'Windows'
+      uses: actions/cache@v4
+      with:
+        path: build/vcpkg_installed
+        key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-binary-cache-
     
     - name: Get OpenCppCoverage
       if: ${{ matrix.BUILD_TYPE == 'Debug' }}

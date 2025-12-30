@@ -145,7 +145,7 @@ BOOST_AUTO_TEST_CASE(ObjectHandleAlreadySet) {
   io_context.run();
   BOOST_CHECK(flag);
 
-  io_context.reset();
+  io_context.restart();
   oh.async_wait([&flag](boost::system::error_code ec) {
     BOOST_CHECK(!ec);
     flag = false;
