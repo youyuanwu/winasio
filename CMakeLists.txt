@@ -33,7 +33,7 @@ endif(${winasio_MAIN_PROJECT})
 
 set(Boost_USE_STATIC_LIBS ON) # use static boost
 set(Boost_NO_WARN_NEW_VERSIONS ON)
-find_package(Boost REQUIRED COMPONENTS log unit_test_framework headers)
+find_package(Boost REQUIRED COMPONENTS unit_test_framework headers)
 find_package(spdlog CONFIG REQUIRED)
 find_package(ut CONFIG REQUIRED)
 
@@ -47,7 +47,6 @@ target_include_directories(winasio INTERFACE
 # header only
 target_compile_definitions(winasio
     INTERFACE _WIN32_WINNT=0x0602
-#    INTERFACE WINASIO_LOG=1
 )
 
 # good practice

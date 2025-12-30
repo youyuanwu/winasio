@@ -17,8 +17,8 @@
 // use beast server for testing
 #include "beast_test_server.hpp"
 
-#include <boost/log/trivial.hpp>
 #include <latch>
+#include <spdlog/spdlog.h>
 
 namespace net = boost::asio; // from <boost/asio.hpp>
 namespace winnet = boost::winasio;
@@ -88,15 +88,15 @@ BOOST_AUTO_TEST_CASE(Basic) {
   winnet::winhttp::async_exec(
       pl, h_connect, h_request, buff,
       [&h_request, &buff](boost::system::error_code ec, std::size_t) {
-        BOOST_LOG_TRIVIAL(debug) << "async_exec handler";
+        spdlog::debug("async_exec handler");
         BOOST_REQUIRE(!ec.failed());
 
         // print result
         std::wstring headers;
         winnet::winhttp::header::get_all_raw_crlf(h_request, ec, headers);
         BOOST_REQUIRE(!ec.failed());
-        BOOST_LOG_TRIVIAL(debug) << headers;
-        BOOST_LOG_TRIVIAL(debug) << winnet::winhttp::buff_to_string(buff);
+        spdlog::debug(L"{}", headers);
+        spdlog::debug("{}", winnet::winhttp::buff_to_string(buff));
 
         // more tests
         // check status

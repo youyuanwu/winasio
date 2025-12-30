@@ -14,9 +14,7 @@
 
 #include <boost/asio/error.hpp>
 
-#ifdef WINASIO_LOG
-#include <boost/log/trivial.hpp>
-#endif
+#include <spdlog/spdlog.h>
 
 #include <boost/winasio/http/http_major_version.hpp>
 
@@ -61,33 +59,23 @@ public:
       : queue_handle_(queue_handle) {
     DWORD retCode = HttpCreateServerSession(HTTPAPI_VERSION_2, &session_id_, 0);
     if (retCode != NO_ERROR) {
-#ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error) << L"Failed to create session, err: " << retCode;
-#endif
+      spdlog::error("Failed to create session, err: {}", retCode);
       return;
     }
     retCode = HttpCreateUrlGroup(session_id_, &group_id_, 0);
     if (retCode != NO_ERROR) {
-#ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error)
-          << L"Failed to create url group, err: " << retCode;
-#endif
+      spdlog::error("Failed to create url group, err: {}", retCode);
       return;
     }
-#ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << L"Successfully create url_session:"
-                             << session_id_ << ", url_group:" << group_id_;
-#endif
+    spdlog::debug("Successfully create url_session: {}, url_group: {}",
+                  session_id_, group_id_);
     HTTP_BINDING_INFO binding_info{};
     binding_info.RequestQueueHandle = queue_handle_.native_handle();
     binding_info.Flags.Present = 1;
     retCode = HttpSetUrlGroupProperty(group_id_, HttpServerBindingProperty,
                                       &binding_info, sizeof(binding_info));
     if (retCode != NO_ERROR) {
-#ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error)
-          << L"Failed to bind to request queue, err:" << retCode;
-#endif
+      spdlog::error("Failed to bind to request queue, err: {}", retCode);
     }
     BOOST_ASSERT(retCode == NO_ERROR);
   }
@@ -105,10 +93,7 @@ public:
   void add_url(std::wstring const &url, system::error_code &ec) {
     DWORD retCode = HttpAddUrlToUrlGroup(group_id_, url.c_str(), 0, 0);
     if (retCode != NO_ERROR) {
-#ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error)
-          << L"Failed to add url: " << url << ", err : " << retCode;
-#endif
+      spdlog::error(L"Failed to add url: {}, err : {}", url, retCode);
     }
     ec = boost::system::error_code(retCode,
                                    boost::asio::error::get_system_category());
@@ -116,10 +101,7 @@ public:
   void remove_url(std::wstring const &url, boost::system::error_code &ec) {
     DWORD retCode = HttpRemoveUrlFromUrlGroup(group_id_, url.c_str(), 0);
     if (retCode != NO_ERROR) {
-#ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(error)
-          << L"Failed to remove url: " << url << ", err : " << retCode;
-#endif
+      spdlog::error(L"Failed to remove url: {}, err : {}", url, retCode);
     }
     ec = boost::system::error_code(retCode,
                                    boost::asio::error::get_system_category());

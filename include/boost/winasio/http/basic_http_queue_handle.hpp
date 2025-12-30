@@ -18,9 +18,7 @@
 #include <boost/asio/windows/basic_overlapped_handle.hpp>
 #include <boost/asio/windows/overlapped_ptr.hpp>
 
-#ifdef WINASIO_LOG
-#include <boost/log/trivial.hpp>
-#endif
+#include <spdlog/spdlog.h>
 
 #include <iostream>
 
@@ -93,10 +91,8 @@ public:
       _Out_ PHTTP_REQUEST RequestBuffer, _In_ ULONG RequestBufferLength,
       BOOST_ASIO_MOVE_ARG(ReadHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
-#ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug)
-        << L"async_recieve_request buff len " << RequestBufferLength;
-#endif
+    spdlog::debug("async_recieve_request buff len {}", RequestBufferLength);
+
     boost::asio::windows::overlapped_ptr optr(this->get_executor(),
                                               std::move(handler));
     ULONG result =
@@ -110,9 +106,8 @@ public:
         );
 
     if (result == NO_ERROR) {
-#ifdef WINASIO_LOG
-      BOOST_LOG_TRIVIAL(debug) << L"async_recieve_request is synchronous";
-#endif
+
+      spdlog::debug("async_recieve_request is synchronous");
       // TODO: investigate if this should be a release() or complete().
       // This needs future testing. If iocp is corrupted, this might be the
       // reason.
@@ -147,10 +142,8 @@ public:
       _Out_ PVOID EntityBuffer, _In_ ULONG EntityBufferLength,
       BOOST_ASIO_MOVE_ARG(ReadHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
-#ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug)
-        << L"async_recieve_body buff len " << EntityBufferLength;
-#endif
+
+    spdlog::debug("async_recieve_body buff len {}", EntityBufferLength);
     boost::asio::windows::overlapped_ptr optr(this->get_executor(),
                                               std::move(handler));
     DWORD result =
@@ -183,9 +176,8 @@ public:
       PHTTP_RESPONSE resp, HTTP_REQUEST_ID requestId, ULONG flags,
       BOOST_ASIO_MOVE_ARG(WriteHandler)
           handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type)) {
-#ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << "async_send_response";
-#endif
+
+    spdlog::debug("async_send_response");
     boost::asio::windows::overlapped_ptr optr(this->get_executor(), handler);
     DWORD result = HttpSendHttpResponse(
         this->native_handle(), // ReqQueueHandle
@@ -217,9 +209,8 @@ public:
 
   void send_response(PHTTP_RESPONSE resp, HTTP_REQUEST_ID requestId,
                      ULONG flags, boost::system::error_code &ec) {
-#ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << "send_response";
-#endif
+
+    spdlog::debug("send_response");
     ULONG bytesSent;
     DWORD result = HttpSendHttpResponse(
         this->native_handle(), // ReqQueueHandle

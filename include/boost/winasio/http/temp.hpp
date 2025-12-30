@@ -22,6 +22,7 @@
 #include <http.h>
 
 #include <boost/winasio/http/http.hpp>
+#include <spdlog/spdlog.h>
 
 #include <functional>
 #include <iostream>
@@ -74,9 +75,7 @@ private:
       handler_;
 
   void receive_request() {
-#ifdef WINASIO_LOG
-    BOOST_LOG_TRIVIAL(debug) << "http_connection receive_request";
-#endif
+    spdlog::debug("http_connection receive_request");
     auto self = this->shared_from_this();
     // this is the vector<char>
     auto &dynamicbuff = request_.get_request_dynamic_buffer();
@@ -85,10 +84,7 @@ private:
         queue_handle_, dynamicbuff,
         [self](boost::system::error_code ec, std::size_t) {
           if (ec) {
-#ifdef WINASIO_LOG
-            BOOST_LOG_TRIVIAL(debug)
-                << "async_recieve_request failed: " << ec.message();
-#endif
+            spdlog::debug("async_recieve_request failed: {}", ec.message());
           } else {
             self->on_receive_request();
             // start another connection
@@ -107,10 +103,7 @@ private:
         [self](boost::system::error_code ec, std::size_t len) {
           UNREFERENCED_PARAMETER(len);
           if (ec) {
-#ifdef WINASIO_LOG
-            BOOST_LOG_TRIVIAL(debug)
-                << "async_recieve_body failed: " << ec.message();
-#endif
+            spdlog::debug("async_recieve_body failed: {}", ec.message());
           } else {
             self->on_recieve_body();
           }
@@ -127,10 +120,7 @@ private:
         HTTP_SEND_RESPONSE_FLAG_DISCONNECT, // single resp flag
         [self](boost::system::error_code ec, std::size_t) {
           if (ec) {
-#ifdef WINASIO_LOG
-            BOOST_LOG_TRIVIAL(debug)
-                << "async_send_response failed: " << ec.message();
-#endif
+            spdlog::debug("async_send_response failed: {}", ec.message());
           }
         });
   }
